@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -7,12 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
-import { createPageUrl } from "@/utils";
 import { useToast } from "@/components/ui/use-toast";
-import { ArrowRight, ArrowLeft, CheckCircle, Brain, Trophy, Zap, Loader2 } from "lucide-react";
+import { ArrowRight, ArrowLeft, CheckCircle, Brain, Trophy, Zap, Loader2, RotateCcw, Shuffle, Star, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import WordCard from "../components/learn/WordCard";
+import KidsWordCard from "../components/kids/KidsWordCard";
 import LearningProgress from "../components/learn/LearningProgress";
 
 import { triggerConfetti } from "../components/common/Confetti";
@@ -20,9 +19,12 @@ import { playSound } from "../components/common/SoundEffects";
 
 import { WordsCache } from "../components/utils/WordsCache";
 
+const createPageUrl = (pageName) => `/${pageName}`;
+
 export default function Learn() {
   const { toast } = useToast();
   const [words, setWords] = useState([]);
+  const [originalWords, setOriginalWords] = useState([]); // ✅ حفظ الترتيب الأصلي
   const [currentIndex, setCurrentIndex] = useState(0);
   const [learnedTodayCount, setLearnedTodayCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -30,6 +32,7 @@ export default function Learn() {
   const [flashCardMap, setFlashCardMap] = useState(new Map());
   const [displayWord, setDisplayWord] = useState(null);
   const [userLevel, setUserLevel] = useState(null);
+  const [isShuffled, setIsShuffled] = useState(false); // ✅ تتبع حالة الخلط
 
   const [userPreferences, setUserPreferences] = useState({
     sound_effects_enabled: true,
@@ -69,7 +72,6 @@ export default function Learn() {
       let allWords;
       let allFlashCards;
 
-      // ✅ مسح Cache للحصول على أحدث البيانات
       WordsCache.clear();
       
       const flashCardsPromise = base44.entities.FlashCard.filter({ created_by: currentUser.email });
@@ -82,28 +84,23 @@ export default function Learn() {
       
       console.log('[Learn.js] 📚 إجمالي الكلمات المحملة:', allWords.length);
       
-      // 🐛 DEBUG: طباعة أول 5 كلمات لمعرفة قيم difficulty_level الفعلية
       console.log('[Learn.js] 🔍 عينة من مستويات الصعوبة:');
       allWords.slice(0, 5).forEach(w => {
         console.log(`  - الكلمة: "${w.word}", المستوى: "${w.difficulty_level}", النوع: ${typeof w.difficulty_level}`);
       });
       
-      // 🔍 طباعة جميع المستويات الفريدة المتاحة
-      const uniqueLevels = [...new Set(allWords.map(w => w.difficulty_level))].filter(Boolean); // Filter out null/undefined/empty string levels
+      const uniqueLevels = [...new Set(allWords.map(w => w.difficulty_level))].filter(Boolean);
       console.log('[Learn.js] 📋 جميع المستويات المتاحة:', uniqueLevels);
       
-      // ✅ الخطوة 1: فلترة حسب المستوى (مع تطبيع النصوص)
       let levelFilteredWords = allWords;
       if (level !== "all") {
         levelFilteredWords = allWords.filter(word => {
-          // تطبيع النص: إزالة المسافات الزائدة وتوحيد الترميز
           const wordLevel = (word.difficulty_level || "").trim();
           const targetLevel = level.trim();
           return wordLevel === targetLevel;
         });
         console.log(`[Learn.js] 🎯 كلمات بعد فلترة المستوى (${level}):`, levelFilteredWords.length);
         
-        // 🐛 DEBUG: إذا لم نجد كلمات، اطبع المستويات المتاحة مرة أخرى
         if (levelFilteredWords.length === 0) {
           console.log('[Learn.js] ⚠️ لم نجد كلمات بمستوى:', level);
           console.log('[Learn.js] 💡 المستويات المتاحة هي:', uniqueLevels);
@@ -118,11 +115,11 @@ export default function Learn() {
           duration: 8000
         });
         setWords([]);
+        setOriginalWords([]);
         setIsLoading(false);
         return;
       }
       
-      // الخطوة 2: فلترة حسب المصدر (جزء/سورة)
       let filteredWords = levelFilteredWords;
       if (currentUser.preferences) {
         const { source_type, selected_juz, selected_surahs } = currentUser.preferences;
@@ -142,6 +139,7 @@ export default function Learn() {
                 duration: 6000
               });
               setWords([]);
+              setOriginalWords([]);
               setIsLoading(false);
               return;
             }
@@ -158,6 +156,7 @@ export default function Learn() {
                 duration: 6000
               });
               setWords([]);
+              setOriginalWords([]);
               setIsLoading(false);
               return;
             }
@@ -173,7 +172,6 @@ export default function Learn() {
       
       console.log('[Learn.js] 🃏 عدد FlashCards:', allFlashCards.length);
       
-      // الخطوة 3: تحديد الكلمات المستحقة للمراجعة
       const dueFlashCards = getDueCards(allFlashCards);
       console.log('[Learn.js] ⏰ عدد FlashCards المستحقة للمراجعة:', dueFlashCards.length);
       
@@ -181,11 +179,9 @@ export default function Learn() {
       const reviewWords = filteredWords.filter(word => dueWordIds.has(word.id));
       console.log('[Learn.js] 📝 كلمات المراجعة:', reviewWords.length);
       
-      // الخطوة 4: تحديد الكلمات الجديدة
       const newWords = filteredWords.filter(word => !newFlashCardMap.has(word.id));
       console.log('[Learn.js] 🆕 كلمات جديدة:', newWords.length);
       
-      // ترتيب كلمات المراجعة حسب الأولوية
       const sortedReviewWords = reviewWords.sort((a, b) => {
         const fcA = newFlashCardMap.get(a.id);
         const fcB = newFlashCardMap.get(b.id);
@@ -194,17 +190,17 @@ export default function Learn() {
         return dateA.getTime() - dateB.getTime();
       });
 
-      // دمج كلمات المراجعة والكلمات الجديدة
       const sessionWords = [...sortedReviewWords, ...newWords];
       console.log('[Learn.js] 🎓 إجمالي كلمات الجلسة:', sessionWords.length);
       
-      // 🐛 DEBUG: طباعة أول كلمة
       if (sessionWords.length > 0) {
         console.log('[Learn.js] 📝 أول كلمة في الجلسة:', sessionWords[0].word);
       }
       
       setWords(sessionWords);
+      setOriginalWords(sessionWords); // ✅ حفظ الترتيب الأصلي
       setCurrentIndex(0);
+      setIsShuffled(false); // ✅ إعادة تعيين حالة الخلط
       
       console.log('[Learn.js] ✅ تم تحميل البيانات بنجاح');
       
@@ -330,8 +326,10 @@ export default function Learn() {
     
     setTimeout(() => {
       const remainingWords = words.filter(w => w.id !== currentWord.id);
+      const remainingOriginal = originalWords.filter(w => w.id !== currentWord.id);
       
       setWords(remainingWords);
+      setOriginalWords(remainingOriginal);
 
       if (remainingWords.length === 0) {
         loadLearningData();
@@ -357,6 +355,64 @@ export default function Learn() {
       setCurrentIndex(currentIndex - 1);
     }
   };
+
+  // ✅ خلط الكلمات
+  const shuffleWords = () => {
+    const shuffled = [...words].sort(() => Math.random() - 0.5);
+    setWords(shuffled);
+    setCurrentIndex(0);
+    setIsShuffled(true);
+  };
+
+  // ✅ إعادة الترتيب الأصلي
+  const restoreOrder = () => {
+    setWords([...originalWords]);
+    setCurrentIndex(0);
+    setIsShuffled(false);
+  };
+
+  const resetSession = () => {
+    loadLearningData();
+    setCurrentIndex(0);
+  };
+
+  // ✅ حفظ كلمة كـ "صعبة"
+  const markAsDifficult = async () => {
+    if (!displayWord || !user) return;
+    
+    try {
+      // تحقق من وجود السجل
+      const existingRecords = await base44.entities.FavoriteWord.filter({
+        word_id: displayWord.id,
+        created_by: user.email
+      });
+
+      if (existingRecords.length === 0) {
+        await base44.entities.FavoriteWord.create({
+          word_id: displayWord.id
+        });
+
+        toast({
+          title: "⭐ تم الإضافة للمفضلة",
+          description: "يمكنك مراجعة هذه الكلمة من صفحة المفضلة",
+          className: "bg-amber-100 text-amber-800"
+        });
+      } else {
+        toast({
+          title: "ℹ️ الكلمة موجودة بالفعل",
+          description: "هذه الكلمة مضافة مسبقاً للمفضلة",
+          className: "bg-blue-100 text-blue-800"
+        });
+      }
+    } catch (error) {
+      console.error("Error marking as difficult:", error);
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء إضافة الكلمة للمفضلة",
+        variant: "destructive"
+      });
+    }
+  };
   
   const currentWord = displayWord;
   const isReviewWord = currentWord && flashCardMap.has(currentWord.id) && !flashCardMap.get(currentWord.id)?.is_new;
@@ -379,12 +435,46 @@ export default function Learn() {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <h1 className="text-3xl md:text-4xl font-bold gradient-text text-center mb-2">
-            تعلم ومراجعة
-          </h1>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex-1" />
+            <h1 className="text-3xl md:text-4xl font-bold gradient-text text-center">
+              تعلم ومراجعة
+            </h1>
+            <div className="flex-1 flex justify-end gap-2">
+              {isShuffled ? (
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={restoreOrder}
+                  title="إعادة الترتيب الأصلي"
+                  className="rounded-full"
+                >
+                  <RotateCcw className="w-5 h-5" />
+                </Button>
+              ) : (
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={shuffleWords}
+                  title="خلط الكلمات"
+                  className="rounded-full"
+                >
+                  <Shuffle className="w-5 h-5" />
+                </Button>
+              )}
+              <Button 
+                variant="outline" 
+                size="icon"
+                onClick={resetSession}
+                title="بدء جلسة جديدة"
+                className="rounded-full"
+              >
+                <RotateCcw className="w-5 h-5" />
+              </Button>
+            </div>
+          </div>
           <p className="text-center text-foreground/70 mb-6 md:mb-8">ابدأ رحلتك في تعلم كلمات القرآن الكريم.</p>
           
-          {/* ملاحظة للمستخدم */}
           <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
             <p className="text-sm text-blue-800 dark:text-blue-300 text-center">
               💡 <strong>ملاحظة:</strong> يمكنك التحكم في ظهور عناصر بطاقة التعلم من خلال: <strong>الإعدادات → عناصر البطاقة → حفظ التغييرات</strong>
@@ -420,14 +510,36 @@ export default function Learn() {
           <div className="grid lg:grid-cols-3 gap-6 md:gap-8">
             <div className="lg:col-span-2">
               <AnimatePresence mode="wait">
-                <WordCard 
-                  key={currentWord?.id || currentIndex}
-                  word={currentWord}
-                  onMarkLearned={handleWordLearned}
-                  isReviewWord={isReviewWord} 
-                  userLevel={userLevel}
-                />
+                {/* ✅ عرض بطاقة خاصة للمبتدئين */}
+                {userLevel === "مبتدئ" ? (
+                  <KidsWordCard 
+                    key={currentWord?.id || currentIndex}
+                    word={currentWord}
+                    onMarkLearned={handleWordLearned}
+                  />
+                ) : (
+                  <WordCard 
+                    key={currentWord?.id || currentIndex}
+                    word={currentWord}
+                    onMarkLearned={handleWordLearned}
+                    isReviewWord={isReviewWord} 
+                    userLevel={userLevel}
+                  />
+                )}
               </AnimatePresence>
+
+              {/* زر إضافة للمفضلة */}
+              <div className="flex justify-center mt-4">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={markAsDifficult}
+                  className="gap-2 bg-amber-50 hover:bg-amber-100 border-amber-300 text-amber-700 dark:bg-amber-900/20 dark:hover:bg-amber-900/30"
+                >
+                  <Star className="w-5 h-5" />
+                  إضافة للمفضلة
+                </Button>
+              </div>
 
               <div className="flex justify-between items-center mt-6">
                 <Button

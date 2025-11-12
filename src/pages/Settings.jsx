@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -8,9 +9,11 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import { motion } from "framer-motion";
-import { User as UserIcon, Palette, Bell, Shield, HelpCircle, Globe, Volume2, Sparkles, Eye, EyeOff, GripVertical } from 'lucide-react';
+import { User as UserIcon, Palette, Bell, Shield, HelpCircle, Globe, Volume2, Sparkles, Eye, EyeOff, GripVertical, BookMarked, BookOpen, Download } from 'lucide-react';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import { Link } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
 
 const SURAHS = [
   "الفاتحة", "البقرة", "آل عمران", "النساء", "المائدة", "الأنعام", "الأعراف", "الأنفال", "التوبة", "يونس",
@@ -41,6 +44,7 @@ export default function Settings() {
         learning_categories: [],
         daily_new_words_goal: 10,
         daily_review_words_goal: 20,
+        quiz_time_limit: 30, // Added quiz_time_limit
         source_type: 'all',
         selected_juz: [],
         selected_surahs: [],
@@ -397,6 +401,41 @@ export default function Settings() {
                                 min="0" 
                             />
                         </div>
+
+                        <div className="border-t pt-6">
+                            <Label className="text-lg font-semibold mb-3 block">
+                                ⏱️ {isArabic ? "إعدادات الاختبار" : "Quiz Settings"}
+                            </Label>
+                            
+                            <div className="space-y-4">
+                                <div>
+                                    <Label htmlFor="quiz-time" className="flex flex-col gap-1 mb-2">
+                                        <span>{isArabic ? "مدة السؤال (بالثواني)" : "Question Time Limit (seconds)"}</span>
+                                        <span className="text-xs font-normal text-muted-foreground">
+                                            {isArabic 
+                                                ? "اضبط 0 للاختبار بدون حد زمني"
+                                                : "Set to 0 for unlimited time"
+                                            }
+                                        </span>
+                                    </Label>
+                                    <Input 
+                                        id="quiz-time"
+                                        type="number" 
+                                        value={preferences.quiz_time_limit !== undefined ? preferences.quiz_time_limit : 60} 
+                                        onChange={e => handlePreferenceChange('quiz_time_limit', parseInt(e.target.value) || 0)} 
+                                        min="0"
+                                        max="180"
+                                        placeholder="60"
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-2">
+                                        {(preferences.quiz_time_limit === 0 || preferences.quiz_time_limit === undefined)
+                                            ? (isArabic ? "⏳ اختبار بدون حد زمني" : "⏳ Unlimited time quiz")
+                                            : (isArabic ? `⏰ ${preferences.quiz_time_limit} ثانية لكل سؤال` : `⏰ ${preferences.quiz_time_limit} seconds per question`)
+                                        }
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
                     </CardContent>
                 );
             
@@ -549,6 +588,66 @@ export default function Settings() {
                         </Alert>
                     </CardContent>
                 );
+
+            case 'tafsir':
+                return (
+                    <CardContent className="space-y-6">
+                        <div className="flex items-center gap-3 mb-4">
+                            <BookMarked className="w-6 h-6 text-primary" />
+                            <h3 className="text-lg font-semibold text-primary">
+                                {isArabic ? "إدارة التفاسير" : "Tafsir Management"}
+                            </h3>
+                        </div>
+
+                        <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 mb-4">
+                            <BookOpen className="w-5 h-5 text-blue-600" />
+                            <AlertDescription className="text-blue-800 dark:text-blue-200">
+                                <div className="font-bold mb-2">
+                                    {isArabic ? "📥 تحميل التفاسير" : "📥 Download Tafsirs"}
+                                </div>
+                                <p className="text-sm mb-3">
+                                    {isArabic
+                                        ? "لاستخدام التفاسير في قارئ القرآن، يجب تحميلها أولاً من صفحة الاستيراد."
+                                        : "To use Tafsirs in the Quran reader, you must first download them from the import page."}
+                                </p>
+                                <Link to={createPageUrl("ImportTafsir")}>
+                                    <Button size="sm" className="bg-primary hover:bg-primary/90 gap-2">
+                                        <Download className="w-4 h-4" />
+                                        {isArabic ? "انتقل لصفحة استيراد التفاسير" : "Go to Tafsir Import Page"}
+                                    </Button>
+                                </Link>
+                            </AlertDescription>
+                        </Alert>
+
+                        <div className="p-4 bg-background-soft rounded-lg">
+                            <h4 className="font-semibold mb-3 text-foreground">
+                                {isArabic ? "التفاسير المتاحة للتحميل:" : "Available Tafsirs for Download:"}
+                            </h4>
+                            <ul className="space-y-2 text-sm text-foreground/80">
+                                <li className="flex items-center gap-2">
+                                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                                    {isArabic ? "تفسير القرطبي" : "Tafsir al-Qurtubi"}
+                                </li>
+                                <li className="flex items-center gap-2">
+                                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                                    {isArabic ? "تفسير ابن كثير" : "Tafsir Ibn Kathir"}
+                                </li>
+                                <li className="flex items-center gap-2">
+                                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                                    {isArabic ? "تفسير السعدي" : "Tafsir al-Sa'di"}
+                                </li>
+                                <li className="flex items-center gap-2">
+                                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                                    {isArabic ? "تفسير الجلالين" : "Tafsir al-Jalalayn"}
+                                </li>
+                                <li className="flex items-center gap-2">
+                                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                                    {isArabic ? "التفسير الميسر" : "Tafsir al-Muyassar"}
+                                </li>
+                            </ul>
+                        </div>
+                    </CardContent>
+                );
             
             default:
                 return null;
@@ -572,6 +671,7 @@ export default function Settings() {
       { id: 'learning', label: isArabic ? 'التعلم' : 'Learning', icon: Bell },
       { id: 'source', label: isArabic ? 'مصدر الكلمات' : 'Word Source', icon: Shield },
       { id: 'card-elements', label: isArabic ? 'عناصر البطاقة' : 'Card Elements', icon: HelpCircle },
+      { id: 'tafsir', label: isArabic ? 'إدارة التفاسير' : 'Tafsir Management', icon: BookMarked },
     ];
 
     return (
@@ -580,6 +680,7 @@ export default function Settings() {
                 <h1 className="text-3xl font-bold gradient-text mb-8">
                     {isArabic ? "الإعدادات" : "Settings"}
                 </h1>
+
                 <div className="grid md:grid-cols-4 gap-8">
                     <div className="md:col-span-1">
                         <div className="flex flex-col space-y-2">
