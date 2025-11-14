@@ -4,19 +4,19 @@ import { Badge } from "@/components/ui/badge";
 import { BookOpen, Brain, Target, Calendar, Flame } from "lucide-react";
 import { motion } from "framer-motion";
 
-export default function StatsGrid({ wordsLearned, totalWords, quizStreak, recentSessions, consecutiveLoginDays }) {
+export default function StatsGrid({ wordsLearned = 0, totalWords = 0, quizStreak = 0, recentSessions = [], consecutiveLoginDays = 1 }) {
   const statsData = [
     {
       title: "الكلمات المتعلمة",
-      value: wordsLearned,
-      total: totalWords,
+      value: wordsLearned || 0,
+      total: totalWords || 0,
       icon: BookOpen,
       color: "blue",
-      percentage: totalWords > 0 ? Math.round(((wordsLearned || 0) / totalWords) * 100) : 0
+      percentage: totalWords > 0 ? Math.round((wordsLearned / totalWords) * 100) : 0
     },
     {
       title: "أيام متتالية",
-      value: consecutiveLoginDays,
+      value: consecutiveLoginDays || 1,
       icon: Flame,
       color: "red",
       streak: true,
@@ -24,7 +24,7 @@ export default function StatsGrid({ wordsLearned, totalWords, quizStreak, recent
     },
     {
       title: "سلسلة النجاح",
-      value: quizStreak,
+      value: quizStreak || 0,
       icon: Target,
       color: "purple",
       streak: true,
@@ -32,7 +32,7 @@ export default function StatsGrid({ wordsLearned, totalWords, quizStreak, recent
     },
     {
       title: "الاختبارات المكتملة",
-      value: recentSessions.length,
+      value: (recentSessions || []).length,
       icon: Brain,
       color: "green"
     }

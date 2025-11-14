@@ -1,12 +1,13 @@
+
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { 
-  BookOpen, Trophy, ShoppingBag, Map, Calendar, Users, Bell, 
+import {
+  BookOpen, Trophy, ShoppingBag, Map, Calendar, Users, Bell,
   Settings, Heart, Sparkles, Target, HelpCircle, CheckCircle2,
-  Activity
+  Activity, Volume2, Bug // Added Volume2 and Bug
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -269,6 +270,256 @@ export default function Help() {
     "واجهة خاصة للأطفال (مبتدئ)"
   ];
 
+  const helpTopics = [
+    {
+      id: "start-learning",
+      icon: HelpCircle,
+      title: "❓ كيف أبدأ التعلم؟",
+      content: (
+        <ol className="list-decimal list-inside space-y-2">
+          <li>سجل دخولك للتطبيق</li>
+          <li>اذهب إلى صفحة "التعلم" من القائمة الجانبية</li>
+          <li>اختر كلمات جديدة للتعلم</li>
+          <li>بعد التعلم، اذهب إلى "الاختبار" لاختبار معرفتك</li>
+          <li>تابع تقدمك في صفحة "التقدم"</li>
+        </ol>
+      )
+    },
+    {
+      id: "earn-gems",
+      icon: Sparkles,
+      title: "💎 كيف أكسب الجواهر؟",
+      content: (
+        <ul className="space-y-2 text-foreground/80">
+          <li className="flex items-start gap-2 justify-end">
+            <span>أكمل الإنجازات واحصل على جواهر</span>
+            <Trophy className="w-5 h-5 text-yellow-600 mt-0.5" />
+          </li>
+          <li className="flex items-start gap-2 justify-end">
+            <span>شارك في التحديات اليومية</span>
+            <Calendar className="w-5 h-5 text-purple-600 mt-0.5" />
+          </li>
+          <li className="flex items-start gap-2 justify-end">
+            <span>أكمل تحديات المجموعات</span>
+            <Users className="w-5 h-5 text-green-600 mt-0.5" />
+          </li>
+          <li className="flex items-start gap-2 justify-end">
+            <span>(100%) احصل على نتائج مثالية</span>
+            <Target className="w-5 h-5 text-blue-600 mt-0.5" />
+          </li>
+          <li className="flex items-start gap-2 justify-end">
+            <span>حافظ على سلسلتك اليومية</span>
+            <Activity className="w-5 h-5 text-orange-600 mt-0.5" />
+          </li>
+        </ul>
+      )
+    },
+    {
+      id: "no-hearts",
+      icon: Heart,
+      title: "❤️ ماذا أفعل عند نفاذ القلوب؟",
+      content: (
+        <ul className="space-y-2">
+          <li>استخدم نافذة التسبيح لاسترجاع قلب واحد •</li>
+          <li>(50 جوهرة) اشترِ "إعادة القلوب" من المتجر •</li>
+          <li>انتظر حتى اليوم التالي لاستعادة القلوب تلقائياً •</li>
+        </ul>
+      )
+    },
+    {
+      id: "add-friends",
+      icon: Users,
+      title: "👥 كيف أضيف أصدقاء؟",
+      content: (
+        <ol className="list-decimal list-inside space-y-2">
+          <li>اذهب إلى صفحة "الأصدقاء"</li>
+          <li>أدخل البريد الإلكتروني للصديق</li>
+          <li>اضغط "إرسال طلب"</li>
+          <li>انتظر حتى يقبل صديقك الطلب</li>
+        </ol>
+      )
+    },
+    {
+      id: "learning-paths",
+      icon: Map,
+      title: "🗺️ ما هي المسارات التعليمية؟",
+      content: (
+        <>
+          <p className="mb-3">
+            المسارات التعليمية هي خطط منظمة تساعدك على تحقيق أهداف محددة في فترة زمنية معينة.
+          </p>
+          <p className="font-medium mb-2">:المسارات المتاحة</p>
+          <ul className="space-y-1">
+            <li>(مبتدئ) 30 يوم لحفظ جزء عم •</li>
+            <li>(متقدم) 3 أشهر للمستوى المتقدم •</li>
+            <li>(مبتدئ) أساسيات القرآن - 7 أيام •</li>
+            <li>(متوسط) رحلة الحفظ - 60 يوم •</li>
+          </ul>
+        </>
+      )
+    },
+    {
+      id: "achievements-vs-challenges",
+      icon: Trophy,
+      title: "🏆 ما الفرق بين الإنجازات والتحديات؟",
+      content: (
+        <div className="space-y-3">
+          <div>
+            <strong className="text-primary">:الإنجازات</strong>
+            <p>(مثل: حفظ 100 كلمة، 30 يوم متتالي) أهداف طويلة المدى تُحقق تلقائياً بمرور الوقت</p>
+          </div>
+          <div>
+            <strong className="text-primary">:التحديات اليومية</strong>
+            <p>(مثل: تعلم 10 كلمات اليوم) أهداف قصيرة المدى تتجدد كل 24 ساعة</p>
+          </div>
+          <div>
+            <strong className="text-primary">:تحديات المجموعات</strong>
+            <p>تحديات خاصة ينشئها رئيس المجموعة لأعضائها</p>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: "common-issues",
+      icon: Bug,
+      title: "🐛 حل المشاكل الشائعة",
+      content: (
+        <div className="space-y-4 text-foreground/80">
+          <div>
+            <strong className="text-red-600">الصفحة لا تظهر؟</strong>
+            <ul className="mt-1 space-y-1 text-sm">
+              <li>تأكد من تسجيل الدخول •</li>
+              <li>(F5) حدّث الصفحة •</li>
+              <li>(Ctrl+Shift+Delete) امسح الكاش •</li>
+            </ul>
+          </div>
+          <div>
+            <strong className="text-red-600">الإشعارات لا تصل؟</strong>
+            <ul className="mt-1 space-y-1 text-sm">
+              <li>تحقق من صفحة الإشعارات مباشرة •</li>
+              <li>تأكد من إعدادات المتصفح •</li>
+            </ul>
+          </div>
+          <div>
+            <strong className="text-red-600">لا أرى تقدمي؟</strong>
+            <ul className="mt-1 space-y-1 text-sm">
+              <li>اذهب إلى صفحة "التقدم" •</li>
+              <li>تأكد من إكمال اختبار واحد على الأقل •</li>
+              <li>حدّث الصفحة •</li>
+            </ul>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: "tts-voice",
+      icon: Volume2,
+      title: "🎙️ تحسين صوت النطق (TTS)",
+      description: "كيفية الحصول على صوت رجل عربي أفضل",
+      content: (
+        <div className="space-y-4">
+          <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+            <h4 className="font-semibold text-blue-800 dark:text-blue-300 mb-2">💡 الطريقة الحالية (مجاني)</h4>
+            <p className="text-sm text-blue-700 dark:text-blue-400 mb-2">
+              التطبيق يستخدم Web Speech API المدمج في المتصفح. الأصوات المتاحة تعتمد على:
+            </p>
+            <ul className="list-disc list-inside text-sm text-blue-700 dark:text-blue-400 space-y-1">
+              <li>نظام التشغيل (Windows/Mac/Android/iOS)</li>
+              <li>المتصفح (Chrome/Safari/Firefox)</li>
+              <li>الأصوات المثبتة على جهازك</li>
+            </ul>
+          </div>
+
+          <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
+            <h4 className="font-semibold text-green-800 dark:text-green-300 mb-2">✅ نصائح لتحسين الصوت:</h4>
+            <ul className="list-decimal list-inside text-sm text-green-700 dark:text-green-400 space-y-2">
+              <li><strong>Chrome على Windows:</strong> اذهب إلى Settings → Languages → Add "Arabic" → Text-to-speech → اختر "Microsoft Naayf" (صوت رجل سعودي)</li>
+              <li><strong>Chrome على Mac:</strong> System Preferences → Accessibility → Spoken Content → اختر صوت "Tarik" أو "Maged"</li>
+              <li><strong>Safari على Mac/iPhone:</strong> يأتي مع أصوات عربية ممتازة افتراضياً</li>
+              <li><strong>Android:</strong> Settings → Accessibility → Text-to-speech → Install "Arabic voices"</li>
+            </ul>
+          </div>
+
+          <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-200 dark:border-purple-800">
+            <h4 className="font-semibold text-purple-800 dark:text-purple-300 mb-2">🚀 الحل الاحترافي (مدفوع)</h4>
+            <p className="text-sm text-purple-700 dark:text-purple-400 mb-3">
+              للحصول على صوت رجل عربي عالي الجودة، يمكن استخدام خدمات TTS المتقدمة:
+            </p>
+            <div className="space-y-3">
+              <div className="bg-white dark:bg-gray-800 p-3 rounded border">
+                <h5 className="font-bold text-sm mb-1">Google Cloud Text-to-Speech ⭐ (الأفضل)</h5>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                  • أصوات عربية احترافية (Wavenet)<br/>
+                  • السعر: ~$4 لكل مليون حرف<br/>
+                  • التجربة المجانية: 1 مليون حرف/شهر
+                </p>
+                <a href="https://cloud.google.com/text-to-speech" target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs underline">
+                  cloud.google.com/text-to-speech →
+                </a>
+              </div>
+
+              <div className="bg-white dark:bg-gray-800 p-3 rounded border">
+                <h5 className="font-bold text-sm mb-1">Microsoft Azure Speech</h5>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                  • أصوات عربية متعددة (خليجي، مصري، شامي)<br/>
+                  • السعر: ~$4 لكل مليون حرف<br/>
+                  • التجربة المجانية: 5 ساعات صوت/شهر
+                </p>
+                <a href="https://azure.microsoft.com/services/cognitive-services/text-to-speech" target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs underline">
+                  azure.microsoft.com/speech →
+                </a>
+              </div>
+
+              <div className="bg-white dark:bg-gray-800 p-3 rounded border">
+                <h5 className="font-bold text-sm mb-1">ElevenLabs 🎯 (AI متقدم)</h5>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                  • أحدث تقنية AI - صوت طبيعي جداً<br/>
+                  • يدعم العربية بجودة عالية<br/>
+                  • السعر: من $5/شهر
+                </p>
+                <a href="https://elevenlabs.io" target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs underline">
+                  elevenlabs.io →
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-800">
+            <h4 className="font-semibold text-yellow-800 dark:text-yellow-300 mb-2">⚙️ كيفية التطبيق (للمطورين)</h4>
+            <p className="text-sm text-yellow-700 dark:text-yellow-400 mb-2">
+              إذا أردت استخدام Google Cloud TTS:
+            </p>
+            <pre className="bg-gray-900 text-green-400 p-3 rounded text-xs overflow-x-auto">
+{`// 1. إنشاء API Key من Google Cloud Console
+// 2. إنشاء Backend Function في pages/functions/
+import { TextToSpeechClient } from '@google-cloud/text-to-speech';
+
+export default async (req) => {
+  const { text } = await req.json();
+  const client = new TextToSpeechClient({
+    apiKey: Deno.env.get('GOOGLE_TTS_API_KEY')
+  });
+  
+  const [response] = await client.synthesizeSpeech({
+    input: { text },
+    voice: {
+      languageCode: 'ar-SA',
+      name: 'ar-SA-Wavenet-A', // صوت رجل
+    },
+    audioConfig: { audioEncoding: 'MP3' },
+  });
+  
+  return new Response(response.audioContent, {
+    headers: { 'Content-Type': 'audio/mp3' }
+  });
+}`}
+            </pre>
+          </div>
+        </div>
+      )
+    }
+  ];
+
   return (
     <div className="p-6 max-w-7xl mx-auto" dir="rtl">
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
@@ -367,9 +618,9 @@ export default function Help() {
           <TabsContent value="pages" dir="rtl">
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
               {pages.map((page) => (
-                <motion.div 
-                  key={page.path} 
-                  initial={{ opacity: 0, scale: 0.95 }} 
+                <motion.div
+                  key={page.path}
+                  initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   className="h-full"
                 >
@@ -588,150 +839,22 @@ export default function Help() {
           {/* أسئلة شائعة */}
           <TabsContent value="faq" dir="rtl">
             <div className="space-y-4 text-right">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-right">❓ كيف أبدأ التعلم؟</CardTitle>
-                </CardHeader>
-                <CardContent className="text-foreground/80 text-right">
-                  <ol className="list-decimal list-inside space-y-2">
-                    <li>سجل دخولك للتطبيق</li>
-                    <li>اذهب إلى صفحة "التعلم" من القائمة الجانبية</li>
-                    <li>اختر كلمات جديدة للتعلم</li>
-                    <li>بعد التعلم، اذهب إلى "الاختبار" لاختبار معرفتك</li>
-                    <li>تابع تقدمك في صفحة "التقدم"</li>
-                  </ol>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-right">💎 كيف أكسب الجواهر؟</CardTitle>
-                </CardHeader>
-                <CardContent className="text-right">
-                  <ul className="space-y-2 text-foreground/80">
-                    <li className="flex items-start gap-2 justify-end">
-                      <span>أكمل الإنجازات واحصل على جواهر</span>
-                      <Trophy className="w-5 h-5 text-yellow-600 mt-0.5" />
-                    </li>
-                    <li className="flex items-start gap-2 justify-end">
-                      <span>شارك في التحديات اليومية</span>
-                      <Calendar className="w-5 h-5 text-purple-600 mt-0.5" />
-                    </li>
-                    <li className="flex items-start gap-2 justify-end">
-                      <span>أكمل تحديات المجموعات</span>
-                      <Users className="w-5 h-5 text-green-600 mt-0.5" />
-                    </li>
-                    <li className="flex items-start gap-2 justify-end">
-                      <span>(100%) احصل على نتائج مثالية</span>
-                      <Target className="w-5 h-5 text-blue-600 mt-0.5" />
-                    </li>
-                    <li className="flex items-start gap-2 justify-end">
-                      <span>حافظ على سلسلتك اليومية</span>
-                      <Activity className="w-5 h-5 text-orange-600 mt-0.5" />
-                    </li>
-                  </ul>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-right">❤️ ماذا أفعل عند نفاذ القلوب؟</CardTitle>
-                </CardHeader>
-                <CardContent className="text-foreground/80 text-right">
-                  <ul className="space-y-2">
-                    <li>استخدم نافذة التسبيح لاسترجاع قلب واحد •</li>
-                    <li>(50 جوهرة) اشترِ "إعادة القلوب" من المتجر •</li>
-                    <li>انتظر حتى اليوم التالي لاستعادة القلوب تلقائياً •</li>
-                  </ul>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-right">👥 كيف أضيف أصدقاء؟</CardTitle>
-                </CardHeader>
-                <CardContent className="text-foreground/80 text-right">
-                  <ol className="list-decimal list-inside space-y-2">
-                    <li>اذهب إلى صفحة "الأصدقاء"</li>
-                    <li>أدخل البريد الإلكتروني للصديق</li>
-                    <li>اضغط "إرسال طلب"</li>
-                    <li>انتظر حتى يقبل صديقك الطلب</li>
-                  </ol>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-right">🗺️ ما هي المسارات التعليمية؟</CardTitle>
-                </CardHeader>
-                <CardContent className="text-foreground/80 text-right">
-                  <p className="mb-3">
-                    المسارات التعليمية هي خطط منظمة تساعدك على تحقيق أهداف محددة في فترة زمنية معينة.
-                  </p>
-                  <p className="font-medium mb-2">:المسارات المتاحة</p>
-                  <ul className="space-y-1">
-                    <li>(مبتدئ) 30 يوم لحفظ جزء عم •</li>
-                    <li>(متقدم) 3 أشهر للمستوى المتقدم •</li>
-                    <li>(مبتدئ) أساسيات القرآن - 7 أيام •</li>
-                    <li>(متوسط) رحلة الحفظ - 60 يوم •</li>
-                  </ul>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-right">🏆 ما الفرق بين الإنجازات والتحديات؟</CardTitle>
-                </CardHeader>
-                <CardContent className="text-foreground/80 text-right">
-                  <div className="space-y-3">
-                    <div>
-                      <strong className="text-primary">:الإنجازات</strong>
-                      <p>(مثل: حفظ 100 كلمة، 30 يوم متتالي) أهداف طويلة المدى تُحقق تلقائياً بمرور الوقت</p>
-                    </div>
-                    <div>
-                      <strong className="text-primary">:التحديات اليومية</strong>
-                      <p>(مثل: تعلم 10 كلمات اليوم) أهداف قصيرة المدى تتجدد كل 24 ساعة</p>
-                    </div>
-                    <div>
-                      <strong className="text-primary">:تحديات المجموعات</strong>
-                      <p>تحديات خاصة ينشئها رئيس المجموعة لأعضائها</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-right">🐛 حل المشاكل الشائعة</CardTitle>
-                </CardHeader>
-                <CardContent className="text-right">
-                  <div className="space-y-4 text-foreground/80">
-                    <div>
-                      <strong className="text-red-600">الصفحة لا تظهر؟</strong>
-                      <ul className="mt-1 space-y-1 text-sm">
-                        <li>تأكد من تسجيل الدخول •</li>
-                        <li>(F5) حدّث الصفحة •</li>
-                        <li>(Ctrl+Shift+Delete) امسح الكاش •</li>
-                      </ul>
-                    </div>
-                    <div>
-                      <strong className="text-red-600">الإشعارات لا تصل؟</strong>
-                      <ul className="mt-1 space-y-1 text-sm">
-                        <li>تحقق من صفحة الإشعارات مباشرة •</li>
-                        <li>تأكد من إعدادات المتصفح •</li>
-                      </ul>
-                    </div>
-                    <div>
-                      <strong className="text-red-600">لا أرى تقدمي؟</strong>
-                      <ul className="mt-1 space-y-1 text-sm">
-                        <li>اذهب إلى صفحة "التقدم" •</li>
-                        <li>تأكد من إكمال اختبار واحد على الأقل •</li>
-                        <li>حدّث الصفحة •</li>
-                      </ul>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              {helpTopics.map((topic) => (
+                <Card key={topic.id}>
+                  <CardHeader>
+                    <CardTitle className="text-right flex items-center gap-2 justify-end">
+                      <span>{topic.title}</span>
+                      {topic.icon && <topic.icon className="w-6 h-6 text-primary flex-shrink-0" />}
+                    </CardTitle>
+                    {topic.description && (
+                      <p className="text-sm text-foreground/70 text-right">{topic.description}</p>
+                    )}
+                  </CardHeader>
+                  <CardContent className="text-foreground/80 text-right">
+                    {topic.content}
+                  </CardContent>
+                </Card>
+              ))}
 
               <Alert className="bg-primary/5 border-primary/20">
                 <AlertDescription className="text-foreground text-right">

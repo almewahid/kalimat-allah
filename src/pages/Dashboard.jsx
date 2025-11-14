@@ -1,341 +1,243 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Link } from "react-router-dom";
-import { createPageUrl } from "@/utils";
-import { 
-  BookOpen, 
-  Brain, 
-  Trophy, 
-  Star, 
-  Target, 
-  Calendar,
-  Zap,
-  Award,
-  AlertCircle,
-  Search as SearchIcon
-} from "lucide-react";
 import { motion } from "framer-motion";
-import { Input } from "@/components/ui/input";
+import { Loader2, AlertCircle, BookOpen } from "lucide-react";
+import { Link } from "react-router-dom";
 
 import LevelCard from "../components/dashboard/LevelCard";
 import StatsGrid from "../components/dashboard/StatsGrid";
 import RecentWords from "../components/dashboard/RecentWords";
 import QuickActions from "../components/dashboard/QuickActions";
 import TutorialModal from "../components/onboarding/TutorialModal";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import GlobalSearch from "../components/search/GlobalSearch";
+
+const createPageUrl = (pageName) => `/${pageName}`;
 
 export default function Dashboard() {
-  const [userProgress, setUserProgress] = useState(null);
-  const [allWords, setAllWords] = useState([]);
-  const [recentSessions, setRecentSessions] = useState([]);
-  const [todayXP, setTodayXP] = useState(0);
   const [user, setUser] = useState(null);
-  const [showTutorial, setShowTutorial] = useState(false);
-  const [error, setError] = useState(null);
+  const [userProgress, setUserProgress] = useState(null);
+  const [learnedWords, setLearnedWords] = useState([]);
+  const [recentQuizzes, setRecentQuizzes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [error, setError] = useState(null);
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [dailyXPEarned, setDailyXPEarned] = useState(0);
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    
     try {
-      setIsLoading(true);
-      setError(null);
-      
-      console.log('[Dashboard] 🔄 Starting to load dashboard data...');
-      
-      // Step 1: Get current user
-      let currentUser;
-      try {
-        currentUser = await base44.auth.me();
-        console.log('[Dashboard] ✅ User loaded:', currentUser?.email);
-        setUser(currentUser);
-      } catch (authError) {
-        console.error('[Dashboard] ❌ Auth error:', authError);
-        throw new Error('فشل تحميل معلومات المستخدم. يرجى تسجيل الدخول مرة أخرى.');
+      const currentUser = await base44.auth.me();
+      setUser(currentUser);
+
+      const [progressData] = await base44.entities.UserProgress.filter({ 
+        created_by: currentUser.email 
+      });
+
+      if (!progressData) {
+        const newProgress = await base44.entities.UserProgress.create({
+          created_by: currentUser.email,
+          total_xp: 0,
+          current_level: 1,
+          words_learned: 0,
+          quiz_streak: 0,
+          learned_words: [],
+          consecutive_login_days: 1,
+          last_login_date: new Date().toISOString().split('T')[0]
+        });
+        setUserProgress(newProgress);
+      } else {
+        // تحديث تسجيل الدخول اليومي
+        const today = new Date().toISOString().split('T')[0];
+        const lastLogin = progressData.last_login_date;
+        
+        if (lastLogin !== today) {
+          const yesterday = new Date();
+          yesterday.setDate(yesterday.getDate() - 1);
+          const yesterdayStr = yesterday.toISOString().split('T')[0];
+          
+          const newConsecutiveDays = lastLogin === yesterdayStr 
+            ? (progressData.consecutive_login_days || 0) + 1 
+            : 1;
+          
+          await base44.entities.UserProgress.update(progressData.id, {
+            last_login_date: today,
+            consecutive_login_days: newConsecutiveDays
+          });
+          
+          setUserProgress({ ...progressData, consecutive_login_days: newConsecutiveDays });
+        } else {
+          setUserProgress(progressData);
+        }
       }
-      
-      // Check if user needs to see tutorial
-      if (!currentUser.has_seen_tutorial) {
+
+      const [allWords, quizSessions] = await Promise.all([
+        base44.entities.QuranicWord.list(),
+        base44.entities.QuizSession.filter({ created_by: currentUser.email })
+      ]);
+
+      const learnedWordIds = progressData?.learned_words || [];
+      const learned = allWords.filter(word => learnedWordIds.includes(word.id)).slice(0, 6);
+      setLearnedWords(learned);
+
+      const sortedQuizzes = quizSessions.sort((a, b) => 
+        new Date(b.created_date) - new Date(a.created_date)
+      ).slice(0, 3);
+      setRecentQuizzes(sortedQuizzes);
+
+      // حساب XP اليومي
+      const today = new Date().toISOString().split('T')[0];
+      const todayQuizzes = quizSessions.filter(q => q.created_date.startsWith(today));
+      const todayXP = todayQuizzes.reduce((sum, q) => sum + (q.xp_earned || 0), 0);
+      setDailyXPEarned(todayXP);
+
+      // عرض الدليل التعليمي للمستخدمين الجدد
+      if (!progressData || progressData.words_learned === 0) {
         setShowTutorial(true);
       }
-      
-      // Step 2: Load data in parallel with error handling
-      console.log('[Dashboard] 📊 Loading user data...');
-      
-      let progressList = [];
-      let wordsData = [];
-      let sessions = [];
-      
-      try {
-        progressList = await base44.entities.UserProgress.filter({ created_by: currentUser.email });
-        console.log('[Dashboard] ✅ Progress loaded:', progressList.length, 'records');
-      } catch (err) {
-        console.warn('[Dashboard] ⚠️ Progress load failed:', err);
-        // Continue with empty progress
-      }
-      
-      try {
-        wordsData = await base44.entities.QuranicWord.list();
-        console.log('[Dashboard] ✅ Words loaded:', wordsData.length, 'words');
-      } catch (err) {
-        console.warn('[Dashboard] ⚠️ Words load failed:', err);
-        // Continue with empty words
-      }
-      
-      try {
-        sessions = await base44.entities.QuizSession.filter({ created_by: currentUser.email }, '-created_date', 5);
-        console.log('[Dashboard] ✅ Sessions loaded:', sessions.length, 'sessions');
-      } catch (err) {
-        console.warn('[Dashboard] ⚠️ Sessions load failed:', err);
-        // Continue with empty sessions
-      }
-      
-      // Step 3: Process progress
-      let progress = progressList[0] || {
-        total_xp: 0,
-        current_level: 1,
-        words_learned: 0,
-        quiz_streak: 0,
-        learned_words: [],
-        consecutive_login_days: 1,
-        last_login_date: new Date().toISOString().split('T')[0]
-      };
 
-      // Login streak logic
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayStr = today.toISOString().split('T')[0];
-
-      const lastLogin = new Date(progress.last_login_date || '1970-01-01');
-      lastLogin.setHours(0, 0, 0, 0);
-      
-      const yesterday = new Date(today);
-      yesterday.setDate(today.getDate() - 1);
-      yesterday.setHours(0, 0, 0, 0);
-
-      let needsUpdate = false;
-      
-      if (lastLogin.getTime() < today.getTime()) { 
-        if (lastLogin.getTime() === yesterday.getTime()) {
-          progress.consecutive_login_days = (progress.consecutive_login_days || 0) + 1;
-        } else {
-          progress.consecutive_login_days = 1;
-        }
-        progress.last_login_date = todayStr;
-        needsUpdate = true;
-      }
-      
-      // Step 4: Update progress if needed
-      if (needsUpdate) {
-        try {
-          if (progress.id) {
-            await base44.entities.UserProgress.update(progress.id, {
-              consecutive_login_days: progress.consecutive_login_days,
-              last_login_date: progress.last_login_date
-            });
-            console.log('[Dashboard] ✅ Progress updated');
-          } else {
-            const newProgress = await base44.entities.UserProgress.create({
-              ...progress,
-              created_by: currentUser.email
-            });
-            progress = newProgress;
-            console.log('[Dashboard] ✅ Progress created');
-          }
-        } catch (updateError) {
-          console.warn('[Dashboard] ⚠️ Progress update failed:', updateError);
-          // Continue without updating
-        }
-      }
-
-      setUserProgress(progress);
-      setAllWords(wordsData);
-      setRecentSessions(sessions);
-
-      // Calculate today's XP
-      const todayDateStr = new Date().toISOString().split('T')[0];
-      const todaySessions = sessions.filter(session => 
-        session.created_date?.startsWith(todayDateStr)
-      );
-      const xpToday = todaySessions.reduce((sum, session) => sum + (session.xp_earned || 0), 0);
-      setTodayXP(xpToday);
-      
-      console.log('[Dashboard] ✅ Dashboard data loaded successfully');
-      
     } catch (error) {
-      console.error('[Dashboard] ❌ Critical error loading dashboard:', error);
-      setError(error.message || 'حدث خطأ غير متوقع أثناء تحميل البيانات');
+      console.error("Error loading dashboard:", error);
+      setError("حدث خطأ في تحميل البيانات. يرجى المحاولة مرة أخرى.");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const handleCloseTutorial = async (settings) => {
-    setShowTutorial(false);
-    
-    try {
-      await base44.auth.updateMe({ 
-        has_seen_tutorial: true,
-        preferences: {
-          ...user?.preferences,
-          ...settings
-        }
-      });
-      
-      window.location.reload();
-    } catch (error) {
-      console.error('[Dashboard] Error updating tutorial status:', error);
-    }
-  };
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
 
-  const getLevelProgress = () => {
-    if (!userProgress) return 0;
-    const currentLevelXP = (userProgress.current_level - 1) * 100;
-    const nextLevelXP = userProgress.current_level * 100;
-    const progressInLevel = userProgress.total_xp - currentLevelXP;
-    const levelRange = nextLevelXP - currentLevelXP;
-    return (progressInLevel / levelRange) * 100;
-  };
+  // حساب التقدم نحو المستوى التالي
+  const currentLevelXP = userProgress?.total_xp || 0;
+  const currentLevel = userProgress?.current_level || 1;
+  const xpForCurrentLevel = (currentLevel - 1) * 100;
+  const xpForNextLevel = currentLevel * 100;
+  const xpInCurrentLevel = currentLevelXP - xpForCurrentLevel;
+  const xpNeededForNextLevel = xpForNextLevel - xpForCurrentLevel;
+  const levelProgress = (xpInCurrentLevel / xpNeededForNextLevel) * 100;
 
-  // Loading state
   if (isLoading) {
     return (
-      <div className="p-6 flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-primary">جارٍ تحميل البيانات...</p>
+          <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-foreground/70 text-lg">جارٍ تحميل لوحة التحكم...</p>
         </div>
       </div>
     );
   }
 
-  // Error state
   if (error) {
     return (
-      <div className="p-6 max-w-2xl mx-auto mt-20">
-        <Alert className="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
-          <AlertCircle className="w-5 h-5 text-red-600" />
-          <AlertDescription className="text-red-800 dark:text-red-300">
-            <div className="font-bold mb-2">❌ خطأ في تحميل البيانات</div>
-            <p className="text-sm mb-4">{error}</p>
-            <div className="space-y-2 text-sm">
-              <p><strong>الحلول الممكنة:</strong></p>
-              <ul className="list-disc list-inside space-y-1">
-                <li>تحقق من اتصالك بالإنترنت</li>
-                <li>حدّث الصفحة (F5)</li>
-                <li>امسح الكاش (Ctrl+Shift+Delete)</li>
-                <li>سجل خروج ثم سجل دخول مرة أخرى</li>
-              </ul>
+      <div className="p-6 max-w-2xl mx-auto">
+        <Card className="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
+          <CardContent className="p-8 text-center">
+            <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-red-700 dark:text-red-400 mb-2">
+              خطأ في تحميل البيانات
+            </h2>
+            <p className="text-red-600 dark:text-red-300 mb-6">
+              {error}
+            </p>
+            <div className="space-y-3">
+              <Button onClick={loadDashboardData} className="w-full">
+                إعادة المحاولة
+              </Button>
+              <div className="text-sm text-red-600 dark:text-red-400 space-y-1">
+                <p>💡 خطوات استكشاف الأخطاء:</p>
+                <ul className="text-right space-y-1">
+                  <li>• تحقق من اتصالك بالإنترنت</li>
+                  <li>• تأكد من تسجيل دخولك</li>
+                  <li>• حاول تحديث الصفحة (F5)</li>
+                </ul>
+              </div>
             </div>
-            <Button 
-              onClick={() => window.location.reload()} 
-              className="mt-4 bg-red-600 hover:bg-red-700"
-            >
-              🔄 إعادة المحاولة
-            </Button>
-          </AlertDescription>
-        </Alert>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
-  // No data state
   if (!userProgress) {
     return (
-      <div className="p-6 flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-primary">جارٍ إعداد حسابك...</p>
-        </div>
+      <div className="p-6 max-w-2xl mx-auto">
+        <Card className="bg-card border-border">
+          <CardContent className="p-8 text-center">
+            <BookOpen className="w-16 h-16 text-primary mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-primary mb-2">
+              مرحباً بك في كلمات القرآن! 🌟
+            </h2>
+            <p className="text-foreground/70 mb-6">
+              ابدأ رحلتك في تعلم معاني القرآن الكريم
+            </p>
+            <Button 
+              onClick={loadDashboardData}
+              size="lg"
+              className="bg-primary text-primary-foreground"
+            >
+              ابدأ الآن
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Tutorial Modal */}
-        <TutorialModal 
-          isOpen={showTutorial}
-          onClose={handleCloseTutorial}
-        />
-
-        {/* Welcome Header */}
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8"
-        >
-          <h1 className="text-4xl font-bold gradient-text mb-2">
-            أهلاً وسهلاً {user?.full_name?.split(' ')[0] || 'بك'}
+    <div className="p-4 md:p-6 max-w-7xl mx-auto">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+      >
+        {/* رسالة ترحيبية */}
+        <div className="mb-6">
+          <h1 className="text-3xl md:text-4xl font-bold gradient-text mb-2">
+            مرحباً، {user?.full_name?.split(' ')[0] || 'صديقي'} 👋
           </h1>
-          <p className="text-center text-foreground/70 mb-4">لنواصل رحلة تعلم كلمات القرآن الكريم.</p>
-          
-          {/* Search Bar */}
-          <div className="max-w-2xl mx-auto relative">
-            <SearchIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-foreground/40" />
-            <Input
-              type="text"
-              placeholder="ابحث عن كلمة، درس، أو معلومة..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && searchQuery.trim()) {
-                  window.location.href = `/Search?q=${encodeURIComponent(searchQuery.trim())}`;
-                }
-              }}
-              className="w-full pr-12 pl-4 py-3 text-lg rounded-xl border-2 border-border focus:border-primary bg-background-soft"
-            />
-            {searchQuery && (
-              <Button
-                size="sm"
-                onClick={() => {
-                  if (searchQuery.trim()) {
-                    window.location.href = `/Search?q=${encodeURIComponent(searchQuery.trim())}`;
-                  }
-                }}
-                className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-primary hover:bg-primary/90"
-              >
-                بحث
-              </Button>
-            )}
-          </div>
-        </motion.div>
+          <p className="text-foreground/70 text-lg">
+            استمر في رحلتك لتعلم كلمات القرآن الكريم
+          </p>
+        </div>
 
-        {/* Level Progress Card */}
-        <LevelCard 
-          currentLevel={userProgress.current_level}
-          totalXP={userProgress.total_xp}
-          progressPercentage={getLevelProgress()}
-          todayXP={todayXP}
+        {/* شريط البحث الشامل */}
+        <div className="mb-8">
+          <GlobalSearch />
+        </div>
+
+        {/* بطاقة المستوى */}
+        <LevelCard
+          level={currentLevel}
+          xp={currentLevelXP}
+          xpForNext={xpForNextLevel}
+          progress={levelProgress}
+          dailyXP={dailyXPEarned}
         />
 
-        {/* Stats Grid */}
-        <StatsGrid 
-          wordsLearned={userProgress.words_learned}
-          totalWords={allWords.length}
-          quizStreak={userProgress.quiz_streak}
-          recentSessions={recentSessions}
-          consecutiveLoginDays={userProgress.consecutive_login_days}
+        {/* الإحصائيات */}
+        <StatsGrid
+          wordsLearned={userProgress.words_learned || 0}
+          quizStreak={userProgress.quiz_streak || 0}
+          loginStreak={userProgress.consecutive_login_days || 1}
+          recentQuizzes={recentQuizzes}
         />
 
-        {/* Quick Actions */}
+        {/* الكلمات الأخيرة */}
+        <RecentWords words={learnedWords} />
+
+        {/* الإجراءات السريعة */}
         <QuickActions />
 
-        {/* Recent Words */}
-        <RecentWords 
-          learnedWordsIds={userProgress.learned_words || []} 
-          allWords={allWords} 
+        {/* الدليل التعليمي */}
+        <TutorialModal
+          isOpen={showTutorial}
+          onClose={() => setShowTutorial(false)}
         />
-      </div>
+      </motion.div>
     </div>
   );
 }

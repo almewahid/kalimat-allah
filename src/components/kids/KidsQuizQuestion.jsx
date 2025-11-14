@@ -1,164 +1,285 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Volume2, CheckCircle, XCircle, Star, Sparkles } from "lucide-react";
+import { CheckCircle, XCircle, Volume2, Star, Sparkles, BookOpen } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAudio } from "@/components/common/AudioContext";
 
-export default function KidsQuizQuestion({ question, onAnswer, timeLeft, onPlayAudio, userLevel }) {
+export default function KidsQuizQuestion({ question, onAnswer, timeLeft }) {
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [hasAnswered, setHasAnswered] = useState(false);
+  const [showStars, setShowStars] = useState(false);
+  
+  const { playAyah, playWord, playMeaning } = useAudio();
 
-  const handleAnswerSelect = (option) => {
+  useEffect(() => {
+    console.log('[KidsQuizQuestion] 📝 Question data:', {
+      word: question?.word?.word,
+      surah_number: question?.word?.surah_number,
+      ayah_number: question?.word?.ayah_number,
+      surah_name: question?.word?.surah_name,
+      context_snippet: question?.word?.context_snippet
+    });
+  }, [question]);
+
+  const handleAnswerSelect = (optionMeaning) => {
     if (hasAnswered) return;
-    
-    setSelectedAnswer(option.meaning);
+
+    setSelectedAnswer(optionMeaning);
     setHasAnswered(true);
-    
+
+    const isCorrect = optionMeaning === question.correctAnswer;
+    if (isCorrect) {
+      setShowStars(true);
+      setTimeout(() => setShowStars(false), 2000);
+    }
+
     setTimeout(() => {
-      onAnswer(option.meaning);
+      onAnswer(optionMeaning);
       setSelectedAnswer(null);
       setHasAnswered(false);
     }, 2000);
   };
 
-  const handlePlayAudio = (e, url) => {
-    e.stopPropagation();
-    if (url && onPlayAudio) {
-      onPlayAudio(url);
+  const handlePlayAyahRecitation = () => {
+    console.log('[KidsQuizQuestion] 🎵 Attempting to play ayah');
+    console.log('[KidsQuizQuestion] Word data:', question?.word);
+    
+    if (!question?.word?.surah_number || !question?.word?.ayah_number) {
+      console.warn('[KidsQuizQuestion] ❌ Missing surah/ayah numbers for ayah recitation');
+      alert('⚠️ معلومات الآية غير متوفرة');
+      return;
     }
+    
+    console.log('[KidsQuizQuestion] ✅ Playing ayah:', `${question.word.surah_number}:${question.word.ayah_number}`);
+    playAyah(question.word.surah_number, question.word.ayah_number, question.word);
   };
 
-  const getButtonStyle = (optionMeaning) => {
-    if (!hasAnswered) {
-      return "bg-gradient-to-r from-blue-400 to-purple-400 hover:from-blue-500 hover:to-purple-500 text-white border-4 border-blue-500";
+  const handlePlayWordAudio = () => {
+    console.log('[KidsQuizQuestion] 🔵 Attempting to play word audio');
+    
+    if (!question?.word?.surah_number || !question?.word?.ayah_number || !question?.word?.word) {
+      console.warn('[KidsQuizQuestion] ❌ Missing surah/ayah/word for word audio');
+      alert('⚠️ معلومات الكلمة غير مكتملة');
+      return;
     }
     
-    if (optionMeaning === question.correctAnswer) {
-      return "bg-green-400 border-4 border-green-600 text-white";
-    }
-    
-    if (optionMeaning === selectedAnswer && optionMeaning !== question.correctAnswer) {
-      return "bg-red-400 border-4 border-red-600 text-white";
-    }
-    
-    return "bg-gray-300 border-4 border-gray-400 text-gray-600";
+    console.log('[KidsQuizQuestion] ✅ Playing word:', question.word.word);
+    playWord(question.word.surah_number, question.word.ayah_number, question.word.word, question.word);
   };
 
-  const getButtonIcon = (optionMeaning) => {
-    if (!hasAnswered) return null;
-    
-    if (optionMeaning === question.correctAnswer) {
-      return <CheckCircle className="w-8 h-8 text-white" />;
-    }
-    
-    if (optionMeaning === selectedAnswer && optionMeaning !== question.correctAnswer) {
-      return <XCircle className="w-8 h-8 text-white" />;
-    }
-    
-    return null;
+  const handlePlayMeaningAudio = (meaning) => {
+    console.log('[KidsQuizQuestion] 🟣 Playing meaning TTS');
+    playMeaning(meaning);
+  };
+
+  const categoryEmojis = {
+    "أسماء": "📛",
+    "أفعال": "⚡",
+    "صفات": "✨",
+    "حروف": "🔤",
+    "أخرى": "📖"
   };
 
   return (
     <motion.div
-      key={question.word.id}
-      initial={{ opacity: 0, scale: 0.9 }}
+      key={question?.word?.id}
+      initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="w-full"
+      exit={{ opacity: 0, scale: 0.95 }}
+      className="relative"
     >
-      <Card className="bg-gradient-to-br from-yellow-100 via-pink-100 to-purple-100 dark:from-yellow-900/30 dark:via-pink-900/30 dark:to-purple-900/30 border-4 border-rainbow shadow-2xl overflow-hidden relative">
-        
-        {/* Celebration Animation */}
-        <AnimatePresence>
-          {hasAnswered && selectedAnswer === question.correctAnswer && (
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: [0, 1.5, 1], rotate: [0, 360] }}
-              exit={{ scale: 0 }}
-              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20"
-            >
-              <Star className="w-32 h-32 text-yellow-400 drop-shadow-2xl" fill="currentColor" />
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <CardContent className="p-8">
-          {/* Badge */}
-          <div className="text-center mb-6">
-            <Badge className="bg-pink-500 text-white text-xl px-6 py-3 animate-pulse">
-              <Sparkles className="w-6 h-6 ml-2" />
-              وضع الأطفال
-            </Badge>
-          </div>
-
-          {/* Word Display - تصغير حجم الخط */}
-          <div className="text-center mb-8">
-            <div className="flex justify-center items-center gap-4">
-              <motion.h2
-                className="text-5xl font-black text-purple-700 dark:text-purple-300 arabic-font drop-shadow-lg"
-                animate={{ scale: [1, 1.1, 1] }}
-                transition={{ repeat: Infinity, duration: 2 }}
-              >
-                {question.word.word}
-              </motion.h2>
-              {question.word.audio_url && (
-                <Button
-                  size="lg"
-                  variant="ghost"
-                  onClick={(e) => handlePlayAudio(e, question.word.audio_url)}
-                  className="bg-blue-400 hover:bg-blue-500 rounded-full p-4"
-                >
-                  <Volume2 className="w-8 h-8 text-white" />
-                </Button>
-              )}
-            </div>
-            
-            <p className="text-2xl font-bold text-purple-600 dark:text-purple-300 mt-4">
-              🤔 ما معنى هذه الكلمة؟
-            </p>
-          </div>
-
-          {/* Options - تصغير حجم الخط وإضافة h-auto */}
-          <div className="grid gap-4">
-            {question.options.map((option, index) => (
+      <AnimatePresence>
+        {showStars && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0 }}
+            className="absolute inset-0 flex items-center justify-center pointer-events-none z-50"
+          >
+            {[...Array(5)].map((_, i) => (
               <motion.div
-                key={index}
-                initial={{ opacity: 0, x: -50 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.15 }}
+                key={i}
+                initial={{ opacity: 0, y: 0 }}
+                animate={{
+                  opacity: [0, 1, 0],
+                  y: [0, -100, -200],
+                  x: [(i - 2) * 50, (i - 2) * 100]
+                }}
+                transition={{ duration: 1.5, delay: i * 0.1 }}
               >
-                <Button
-                  variant="outline"
-                  onClick={() => handleAnswerSelect(option)}
-                  disabled={hasAnswered}
-                  className={`w-full p-6 text-right justify-between text-lg font-bold rounded-2xl shadow-lg transition-all duration-300 transform hover:scale-105 ${getButtonStyle(option.meaning)} break-words whitespace-normal min-h-[80px] h-auto`}
-                >
-                  <span className="flex-1 text-right leading-relaxed pr-3 overflow-wrap-anywhere">{option.meaning}</span>
-                  <div className="flex items-center gap-3 flex-shrink-0 mr-2">
-                    {getButtonIcon(option.meaning)}
-                    {option.audio_url && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={(e) => handlePlayAudio(e, option.audio_url)}
-                        className="h-10 w-10 bg-white/50 hover:bg-white/80 rounded-full flex-shrink-0"
-                      >
-                        <Volume2 className="w-6 h-6 text-purple-600" />
-                      </Button>
-                    )}
-                  </div>
-                </Button>
+                <Star className="w-12 h-12 text-yellow-400 fill-yellow-400" />
               </motion.div>
             ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <Card className="bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 border-4 border-purple-300 dark:border-purple-700 shadow-2xl overflow-hidden">
+        <CardContent className="p-6 md:p-8">
+          {/* عنوان مرح */}
+          <div className="text-center mb-6">
+            <motion.div
+              animate={{ rotate: [0, 10, -10, 0] }}
+              transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 2 }}
+              className="inline-block"
+            >
+              <Sparkles className="w-8 h-8 text-purple-500 mx-auto mb-2" />
+            </motion.div>
+            <h3 className="text-2xl font-bold text-purple-800 dark:text-purple-300">
+              ما معنى هذه الكلمة؟
+            </h3>
           </div>
+
+          {/* الكلمة */}
+          <div className="text-center mb-6 bg-white/80 dark:bg-gray-800/80 p-8 rounded-3xl shadow-xl border-4 border-purple-200">
+            <motion.h2
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              className="text-7xl md:text-8xl font-bold text-purple-600 dark:text-purple-400 arabic-font mb-6 drop-shadow-lg"
+            >
+              {question?.word?.word}
+            </motion.h2>
+
+            {/* أزرار الصوت الكبيرة */}
+            <div className="flex justify-center gap-4 mb-6">
+              {/* 🟢 تلاوة الآية */}
+              <Button
+                size="lg"
+                onClick={handlePlayAyahRecitation}
+                className="bg-gradient-to-r from-green-400 to-green-600 hover:from-green-500 hover:to-green-700 text-white gap-2 text-xl px-8 py-8 rounded-3xl shadow-2xl border-4 border-green-300 transform hover:scale-105 transition-all"
+              >
+                <Volume2 className="w-8 h-8" />
+                <span className="font-bold">🎵 استمع للآية</span>
+              </Button>
+
+              {/* 🔵 نطق الكلمة */}
+              <Button
+                size="lg"
+                onClick={handlePlayWordAudio}
+                className="bg-gradient-to-r from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700 text-white gap-2 text-xl px-8 py-8 rounded-3xl shadow-2xl border-4 border-blue-300 transform hover:scale-105 transition-all"
+              >
+                <Volume2 className="w-8 h-8" />
+                <span className="font-bold">🗣️ نطق الكلمة</span>
+              </Button>
+            </div>
+
+            {/* ✅ نص الآية مع رقمها */}
+            {question?.word?.context_snippet && (
+              <div className="mt-6 p-6 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/30 dark:to-orange-900/30 rounded-2xl border-4 border-amber-300 dark:border-amber-700 shadow-lg">
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  <BookOpen className="w-5 h-5 text-amber-700 dark:text-amber-400" />
+                  <h4 className="text-sm font-bold text-amber-800 dark:text-amber-300">
+                    📖 الآية الكريمة
+                  </h4>
+                </div>
+                
+                <p className="text-2xl text-amber-900 dark:text-amber-200 arabic-font leading-relaxed mb-3 font-semibold">
+                  {question.word.context_snippet}
+                </p>
+                
+                <Badge variant="outline" className="bg-amber-100 dark:bg-amber-900/50 border-2 border-amber-400 text-base px-4 py-2">
+                  📚 سورة {question.word.surah_name} - آية {question.word.ayah_number}
+                </Badge>
+              </div>
+            )}
+
+            {/* الفئة */}
+            {question?.word?.category && (
+              <div className="mt-4">
+                <Badge className="text-xl px-6 py-3 bg-purple-200 text-purple-800 dark:bg-purple-800 dark:text-purple-200 border-2 border-purple-400">
+                  {categoryEmojis[question.word.category] || "📖"} {question.word.category}
+                </Badge>
+              </div>
+            )}
+          </div>
+
+          {/* الخيارات */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {question?.options?.map((option, index) => {
+              const isSelected = selectedAnswer === option.meaning;
+              const isCorrect = hasAnswered && option.meaning === question.correctAnswer;
+              const isWrong = hasAnswered && isSelected && option.meaning !== question.correctAnswer;
+
+              const colors = [
+                "from-red-400 to-red-500 border-red-300",
+                "from-blue-400 to-blue-500 border-blue-300",
+                "from-green-400 to-green-500 border-green-300",
+                "from-yellow-400 to-yellow-500 border-yellow-300"
+              ];
+
+              return (
+                <motion.div
+                  key={index}
+                  whileHover={!hasAnswered ? { scale: 1.08, rotate: 2 } : {}}
+                  whileTap={!hasAnswered ? { scale: 0.95 } : {}}
+                >
+                  <Button
+                    onClick={() => !hasAnswered && handleAnswerSelect(option.meaning)}
+                    disabled={hasAnswered}
+                    className={`
+                      w-full min-h-[120px] text-2xl p-6 rounded-3xl font-bold shadow-2xl transition-all duration-300 border-4
+                      ${!hasAnswered ? `bg-gradient-to-br ${colors[index]} text-white hover:shadow-3xl` : ''}
+                      ${isCorrect ? 'bg-gradient-to-br from-green-500 to-green-600 text-white scale-110 ring-8 ring-green-300 border-green-400' : ''}
+                      ${isWrong ? 'bg-gradient-to-br from-red-500 to-red-600 text-white scale-95 border-red-400' : ''}
+                      ${!isSelected && !isCorrect && hasAnswered ? 'opacity-40' : ''}
+                    `}
+                  >
+                    <span className="flex items-center justify-between w-full gap-4">
+                      <span className="flex-1 text-right leading-relaxed">{option.meaning}</span>
+                      <div className="flex items-center gap-3">
+                        {isCorrect && (
+                          <CheckCircle className="w-10 h-10 animate-bounce" />
+                        )}
+                        {isWrong && (
+                          <XCircle className="w-10 h-10 animate-pulse" />
+                        )}
+                        
+                        {/* 🟣 زر TTS للمعنى */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePlayMeaningAudio(option.meaning);
+                          }}
+                          className="h-12 w-12 hover:bg-white/30 rounded-full"
+                        >
+                          <Volume2 className="w-6 h-6" />
+                        </Button>
+                      </div>
+                    </span>
+                  </Button>
+                </motion.div>
+              );
+            })}
+          </div>
+
+          {/* رسالة تشجيعية */}
+          {hasAnswered && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-8 text-center"
+            >
+              {selectedAnswer === question.correctAnswer ? (
+                <div className="bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 p-6 rounded-3xl border-4 border-green-400 shadow-xl">
+                  <p className="text-3xl font-bold text-green-700 dark:text-green-300">
+                    🎉 أحسنت! إجابة ممتازة! 🌟
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-gradient-to-r from-red-100 to-pink-100 dark:from-red-900/30 dark:to-pink-900/30 p-6 rounded-3xl border-4 border-red-400 shadow-xl">
+                  <p className="text-3xl font-bold text-red-700 dark:text-red-300">
+                    💪 حاول مرة أخرى! أنت تتعلم! 📚
+                  </p>
+                </div>
+              )}
+            </motion.div>
+          )}
         </CardContent>
       </Card>
-
-      <style jsx>{`
-        .border-rainbow {
-          border-image: linear-gradient(45deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3, #54a0ff) 1;
-        }
-      `}</style>
     </motion.div>
   );
 }

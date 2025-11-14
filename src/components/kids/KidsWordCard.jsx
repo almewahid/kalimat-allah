@@ -1,473 +1,206 @@
-
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
-import { Volume2, CheckCircle, Eye, Loader2, StickyNote, Star, RotateCcw } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { base44 } from "@/api/base44Client";
+import { Volume2, CheckCircle, Star, Sparkles, BookOpen } from "lucide-react";
+import { motion } from "framer-motion";
+import { useAudio } from "@/components/common/AudioContext";
 
-export default function KidsWordCard({ word, onMarkLearned, audioRef, userLevel }) {
-  const [showMeaning, setShowMeaning] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isFlipped, setIsFlipped] = useState(false);
+export default function KidsWordCard({ word, onMarkLearned }) {
+  const { playAyah, playWord, playMeaning } = useAudio();
 
-  const handleReveal = () => {
-    setShowMeaning(true);
+  const handlePlayAyahRecitation = () => {
+    console.log('[KidsWordCard] 🎵 Playing ayah');
+    if (!word?.surah_number || !word?.ayah_number) {
+      console.warn('[KidsWordCard] ❌ Missing surah/ayah');
+      alert('⚠️ معلومات الآية غير متوفرة');
+      return;
+    }
+    playAyah(word.surah_number, word.ayah_number, word);
   };
 
-  const handleMarkLearned = useCallback(async () => {
-    setIsProcessing(true);
-    try {
-      await onMarkLearned(word.id);
-    } catch (error) {
-      console.error("Failed to mark word as learned:", error);
-      setIsProcessing(false);
+  const handlePlayWordAudio = () => {
+    console.log('[KidsWordCard] 🔵 Playing word');
+    if (!word?.surah_number || !word?.ayah_number || !word?.word) {
+      console.warn('[KidsWordCard] ❌ Missing word data');
+      alert('⚠️ معلومات الكلمة غير مكتملة');
+      return;
     }
-  }, [onMarkLearned, word.id]);
-
-  // Favorite functionality
-  const [isFavorite, setIsFavorite] = useState(false);
-  const [favoriteLoading, setFavoriteLoading] = useState(false);
-
-  useEffect(() => {
-    checkFavoriteStatus();
-  }, [word?.id]);
-
-  const checkFavoriteStatus = async () => {
-    if (!word) return;
-    try {
-      const user = await base44.auth.me();
-      const favorites = await base44.entities.FavoriteWord.filter({
-        word_id: word.id,
-        created_by: user.email
-      });
-      setIsFavorite(favorites.length > 0);
-    } catch (error) {
-      console.log("Error checking favorite status:", error);
-    }
+    playWord(word.surah_number, word.ayah_number, word.word, word);
   };
 
-  const toggleFavorite = async () => {
-    if (favoriteLoading || !word) return;
-    setFavoriteLoading(true);
-    try {
-      const user = await base44.auth.me();
-      const favorites = await base44.entities.FavoriteWord.filter({
-        word_id: word.id,
-        created_by: user.email
-      });
-
-      if (favorites.length > 0) {
-        await base44.entities.FavoriteWord.delete(favorites[0].id);
-        setIsFavorite(false);
-      } else {
-        await base44.entities.FavoriteWord.create({
-          word_id: word.id,
-          created_by: user.email
-        });
-        setIsFavorite(true);
-      }
-    } catch (error) {
-      console.error("Error toggling favorite:", error);
-    } finally {
-      setFavoriteLoading(false);
-    }
+  const handleSpeakMeaning = () => {
+    if (!word?.meaning) return;
+    const textToSpeak = `${word.meaning}. ${word.alternative_meanings?.join('، ') || ''}`;
+    playMeaning(textToSpeak);
   };
 
-  // Note functionality
-  const [userNote, setUserNote] = useState("");
-  const [showNoteDialog, setShowNoteDialog] = useState(false);
-  const [noteLoading, setNoteLoading] = useState(false);
-
-  useEffect(() => {
-    loadUserNote();
-  }, [word?.id]);
-
-  const loadUserNote = async () => {
-    if (!word) return;
-    try {
-      const user = await base44.auth.me();
-      const notes = await base44.entities.UserNote.filter({
-        word_id: word.id,
-        created_by: user.email
-      });
-      if (notes.length > 0) {
-        setUserNote(notes[0].content);
-      } else {
-        setUserNote("");
-      }
-    } catch (error) {
-      console.log("Error loading note:", error);
-    }
+  const categoryEmojis = {
+    "أسماء": "📛",
+    "أفعال": "⚡",
+    "صفات": "✨",
+    "حروف": "🔤",
+    "أخرى": "📖"
   };
-
-  const saveNote = async () => {
-    if (noteLoading || !word) return;
-    setNoteLoading(true);
-    try {
-      const user = await base44.auth.me();
-      const notes = await base44.entities.UserNote.filter({
-        word_id: word.id,
-        created_by: user.email
-      });
-
-      if (notes.length > 0) {
-        if (userNote.trim()) {
-          await base44.entities.UserNote.update(notes[0].id, { content: userNote });
-        } else {
-          await base44.entities.UserNote.delete(notes[0].id);
-        }
-      } else if (userNote.trim()) {
-        await base44.entities.UserNote.create({
-          word_id: word.id,
-          content: userNote,
-          created_by: user.email
-        });
-      }
-      setShowNoteDialog(false);
-    } catch (error) {
-      console.error("Error saving note:", error);
-    } finally {
-      setNoteLoading(false);
-    }
-  };
-
-  // تحويل رابط YouTube إلى صيغة embed
-  const getYouTubeEmbedUrl = (url) => {
-    if (!url) return null;
-    
-    let videoId = null;
-    
-    if (url.includes('youtube.com/watch?v=')) {
-      videoId = url.split('v=')[1]?.split('&')[0];
-    } else if (url.includes('youtu.be/')) {
-      videoId = url.split('youtu.be/')[1]?.split('?')[0];
-    } else if (url.includes('youtube.com/embed/')) {
-      videoId = url.split('embed/')[1]?.split('?')[0];
-    }
-    
-    return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
-  };
-
-  const embedUrl = getYouTubeEmbedUrl(word.youtube_url);
-
-  if (!word) return null;
 
   return (
     <motion.div
-      key={word.id}
+      layout
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.9 }}
       transition={{ duration: 0.3 }}
-      className="relative w-full"
+      className="w-full"
     >
-      {/* Toolbar Icons */}
-      <div className="flex justify-end gap-2 mb-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setShowNoteDialog(true)}
-          className="bg-yellow-100 hover:bg-yellow-200 text-yellow-700 rounded-full"
-        >
-          <StickyNote className="w-5 h-5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={toggleFavorite}
-          disabled={favoriteLoading}
-          className={`rounded-full ${isFavorite ? "bg-red-100 text-red-600 hover:bg-red-200" : "bg-gray-100 hover:bg-gray-200"}`}
-        >
-          {favoriteLoading ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
-          ) : (
-            <Star className={`w-5 h-5 ${isFavorite ? 'fill-current' : ''}`} />
-          )}
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setIsFlipped(!isFlipped)}
-          className="bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-full"
-        >
-          <RotateCcw className="w-5 h-5" />
-        </Button>
-      </div>
-
-      <Card className="bg-gradient-to-br from-yellow-100 via-pink-100 to-purple-100 dark:from-yellow-900/30 dark:via-pink-900/30 dark:to-purple-900/30 border-4 border-primary/30 shadow-2xl rounded-3xl overflow-hidden">
-        {/* Stars decoration */}
-        <div className="absolute inset-0 w-full h-full pointer-events-none opacity-20">
-          {[...Array(8)].map((_, i) => (
+      <Card className="bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 border-4 border-purple-300 dark:border-purple-700 shadow-2xl overflow-hidden">
+        <CardContent className="p-6 md:p-10">
+          {/* عنوان مرح */}
+          <div className="text-center mb-6">
             <motion.div
-              key={i}
-              animate={{ y: [0, -10, 0], rotate: [0, 360] }}
-              transition={{ duration: 3 + i, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute text-3xl"
-              style={{ left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%` }}
+              animate={{ rotate: [0, 10, -10, 0] }}
+              transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 2 }}
+              className="inline-block"
             >
-              ⭐
+              <Sparkles className="w-10 h-10 text-purple-500 mx-auto mb-3" />
             </motion.div>
-          ))}
-        </div>
-
-        <CardContent className="p-8 relative z-10 text-center">
-          {/* الكلمة */}
-          <div className="text-center mb-4">
-            <motion.div
-              key={`word-display-${word.id}`}
-              animate={{ scale: [1, 1.05, 1] }}
-              transition={{ duration: 2, repeat: Infinity }}
-              className="mb-4"
-            >
-              <h2 className="text-6xl font-bold text-primary dark:text-purple-300 arabic-font drop-shadow-lg">
-                📖 {word.word}
-              </h2>
-            </motion.div>
+            <h3 className="text-3xl font-bold text-purple-800 dark:text-purple-300 mb-2">
+              تعلم كلمة جديدة! 🌟
+            </h3>
           </div>
 
-          {/* الآية الكاملة */}
-          {word.context_snippet && (
-            <div className="mb-4 bg-amber-100 dark:bg-amber-900/30 p-4 rounded-2xl border-2 border-amber-300 dark:border-amber-700">
-              <p className="text-lg md:text-xl text-center text-foreground arabic-font leading-relaxed">
-                {word.context_snippet.split(word.word).map((part, index, array) => (
-                  <React.Fragment key={index}>
-                    {part}
-                    {index < array.length - 1 && (
-                      <span className="text-primary font-bold bg-primary/30 px-2 py-1 rounded text-2xl">
-                        {word.word}
-                      </span>
-                    )}
-                  </React.Fragment>
+          {/* الكلمة */}
+          <div className="text-center mb-8 bg-white/80 dark:bg-gray-800/80 p-8 rounded-3xl shadow-xl border-4 border-purple-200">
+            <motion.h2
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 200 }}
+              className="text-8xl md:text-9xl font-bold text-purple-600 dark:text-purple-400 mb-6 arabic-font drop-shadow-lg"
+            >
+              {word.word}
+            </motion.h2>
+
+            {/* أزرار الصوت الكبيرة */}
+            <div className="flex justify-center gap-4 mb-6 flex-wrap">
+              {/* 🟢 تلاوة الآية */}
+              {word.surah_number && word.ayah_number && (
+                <Button
+                  size="lg"
+                  onClick={handlePlayAyahRecitation}
+                  className="bg-gradient-to-r from-green-400 to-green-600 hover:from-green-500 hover:to-green-700 text-white gap-2 text-xl px-8 py-8 rounded-3xl shadow-2xl border-4 border-green-300 transform hover:scale-105 transition-all"
+                >
+                  <Volume2 className="w-8 h-8" />
+                  <span className="font-bold">🎵 تلاوة الآية</span>
+                </Button>
+              )}
+
+              {/* 🔵 نطق الكلمة */}
+              {word.surah_number && word.ayah_number && (
+                <Button
+                  size="lg"
+                  onClick={handlePlayWordAudio}
+                  className="bg-gradient-to-r from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700 text-white gap-2 text-xl px-8 py-8 rounded-3xl shadow-2xl border-4 border-blue-300 transform hover:scale-105 transition-all"
+                >
+                  <Volume2 className="w-8 h-8" />
+                  <span className="font-bold">🗣️ نطق الكلمة</span>
+                </Button>
+              )}
+            </div>
+
+            {/* ✅ نص الآية مع رقمها */}
+            {word.context_snippet && (
+              <div className="mt-6 p-6 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/30 dark:to-orange-900/30 rounded-2xl border-4 border-amber-300 dark:border-amber-700 shadow-lg">
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  <BookOpen className="w-5 h-5 text-amber-700 dark:text-amber-400" />
+                  <h4 className="text-sm font-bold text-amber-800 dark:text-amber-300">
+                    📖 الآية الكريمة
+                  </h4>
+                </div>
+                
+                <p className="text-2xl text-amber-900 dark:text-amber-200 arabic-font leading-relaxed mb-3 font-semibold">
+                  {word.context_snippet}
+                </p>
+                
+                <Badge variant="outline" className="bg-amber-100 dark:bg-amber-900/50 border-2 border-amber-400 text-base px-4 py-2">
+                  📚 سورة {word.surah_name} - آية {word.ayah_number}
+                </Badge>
+              </div>
+            )}
+
+            {/* الفئة */}
+            {word.category && (
+              <div className="mt-4">
+                <Badge className="text-xl px-6 py-3 bg-purple-200 text-purple-800 dark:bg-purple-800 dark:text-purple-200 border-2 border-purple-400">
+                  {categoryEmojis[word.category] || "📖"} {word.category}
+                </Badge>
+              </div>
+            )}
+          </div>
+
+          {/* المعنى */}
+          <div className="bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 p-8 rounded-3xl border-4 border-green-300 shadow-xl mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-2xl font-bold text-green-800 dark:text-green-300 flex items-center gap-2">
+                <Star className="w-7 h-7" />
+                المعنى
+              </h3>
+              <Button
+                size="lg"
+                onClick={handleSpeakMeaning}
+                className="bg-gradient-to-r from-purple-400 to-purple-600 hover:from-purple-500 hover:to-purple-700 text-white gap-2 px-6 py-6 rounded-2xl border-4 border-purple-300"
+              >
+                <Volume2 className="w-6 h-6" />
+                🟣 استمع
+              </Button>
+            </div>
+            <p className="text-3xl font-bold text-green-900 dark:text-green-100">
+              {word.meaning}
+            </p>
+          </div>
+
+          {/* المعاني البديلة */}
+          {word.alternative_meanings && word.alternative_meanings.length > 0 && (
+            <div className="bg-gradient-to-r from-blue-100 to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30 p-8 rounded-3xl border-4 border-blue-300 shadow-xl mb-6">
+              <h3 className="text-2xl font-bold text-blue-800 dark:text-blue-300 mb-4">
+                معانٍ أخرى 📚
+              </h3>
+              <ul className="space-y-3">
+                {word.alternative_meanings.map((meaning, index) => (
+                  <li key={index} className="flex items-center gap-3 text-blue-900 dark:text-blue-100">
+                    <span className="w-4 h-4 bg-blue-500 rounded-full flex-shrink-0"></span>
+                    <span className="text-2xl font-semibold">{meaning}</span>
+                  </li>
                 ))}
-              </p>
+              </ul>
             </div>
           )}
 
-          {/* اسم السورة ورقم الآية */}
-          <div className="mb-6">
-            <Badge className="bg-primary/20 text-primary dark:text-purple-200 border-2 border-primary dark:border-purple-500 text-lg px-4 py-2 rounded-full">
-              سورة {word.surah_name} - آية {word.ayah_number}
-            </Badge>
-          </div>
-
-          {/* الصورة (تظهر دائماً) */}
+          {/* الصورة */}
           {word.image_url && (
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.2 }}
-              className="mx-auto mb-6"
-            >
+            <div className="bg-gradient-to-r from-orange-100 to-yellow-100 dark:from-orange-900/30 dark:to-yellow-900/30 p-8 rounded-3xl border-4 border-orange-300 shadow-xl mb-6">
+              <h3 className="text-2xl font-bold text-orange-800 dark:text-orange-300 mb-4 text-center">
+                صورة توضيحية 🖼️
+              </h3>
               <img
                 src={word.image_url}
                 alt={word.word}
-                className="w-64 h-64 object-cover rounded-3xl border-4 border-purple-300 dark:border-purple-700 shadow-xl mx-auto"
+                className="w-full rounded-2xl shadow-lg border-4 border-white"
               />
-            </motion.div>
+            </div>
           )}
 
-          <AnimatePresence mode="wait">
-            {!showMeaning ? (
-              <motion.div
-                key="question"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="text-center space-y-6"
-              >
-                {/* كارت السؤال */}
-                <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl p-8 border-4 border-dashed border-primary/30">
-                  <div className="text-6xl mb-4">🤔</div>
-                  <p className="text-3xl font-bold text-foreground dark:text-gray-100 mb-4">
-                    ماذا تعني هذه الكلمة؟
-                  </p>
-                  <p className="text-xl text-foreground/70 dark:text-gray-300">اضغط الزر لتعرف المعنى!</p>
-                </div>
-
-                {/* زر اكشف المعنى */}
-                <Button
-                  onClick={handleReveal}
-                  size="lg"
-                  className="w-full py-8 text-2xl bg-gradient-to-r from-primary to-secondary hover:scale-105 transition-transform rounded-2xl shadow-xl"
-                >
-                  <Eye className="w-8 h-8 ml-3" />
-                  اكشف المعنى! 🎉
-                </Button>
-
-                {/* زر الاستماع (قبل الكشف) */}
-                {word.audio_url && (
-                  <Button
-                    onClick={() => audioRef.current?.play()}
-                    variant="outline"
-                    size="lg"
-                    className="w-full py-6 text-xl border-4 border-primary/30 dark:border-purple-700 hover:bg-primary/10 dark:hover:bg-purple-900/20 rounded-2xl"
-                  >
-                    <Volume2 className="w-6 h-6 ml-2 text-primary dark:text-purple-400" />
-                    استمع للكلمة 🔊
-                  </Button>
-                )}
-              </motion.div>
-            ) : (
-              <motion.div
-                key="answer"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                className="space-y-6"
-              >
-                {/* كارت المعنى */}
-                <div className="bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 rounded-2xl p-8 border-4 border-green-300 dark:border-green-700 text-center">
-                  <div className="text-6xl mb-4">✨</div>
-                  <h3 className="text-2xl font-bold text-green-700 dark:text-green-300 mb-4">المعنى:</h3>
-                  <p className="text-3xl font-bold text-green-900 dark:text-green-100 mb-4">{word.meaning}</p>
-                  
-                  {word.alternative_meanings && word.alternative_meanings.length > 0 && (
-                    <div className="mt-4 text-left">
-                      <p className="text-xl font-semibold text-green-600 dark:text-green-400 mb-2">معاني إضافية:</p>
-                      <ul className="list-disc list-inside text-green-800 dark:text-green-200 text-lg">
-                        {word.alternative_meanings.map((alt, index) => (
-                          <li key={index}>{alt}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.3 }}
-                    className="mt-8"
-                  >
-                    <div className="text-6xl">🎊 أحسنت! 🎊</div>
-                  </motion.div>
-                </div>
-
-                {/* السياق أو المثال */}
-                {(word.context_snippet || word.example_usage) && (
-                  <div className="bg-amber-100 dark:bg-amber-900/30 rounded-3xl p-6 border-4 border-amber-300 dark:border-amber-700">
-                    <p className="text-xl font-bold text-amber-800 dark:text-amber-200 mb-3">
-                      📖 {word.context_snippet ? "السياق" : "مثال"}
-                    </p>
-                    <p className="text-lg text-amber-900 dark:text-amber-100 arabic-font leading-relaxed">
-                      {word.context_snippet || word.example_usage}
-                    </p>
-                  </div>
-                )}
-
-                {/* زر تشغيل الصوت (بعد الكشف) */}
-                {word.audio_url && (
-                  <Button
-                    onClick={() => audioRef.current?.play()}
-                    variant="outline"
-                    size="lg"
-                    className="w-full py-6 text-xl border-4 border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-2xl"
-                  >
-                    <Volume2 className="w-6 h-6 ml-2 text-blue-600 dark:text-blue-400" />
-                    🔊 اسمع الكلمة
-                  </Button>
-                )}
-
-                {/* فيديو اليوتيوب */}
-                {embedUrl && (
-                  <motion.div
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ delay: 0.4 }}
-                    className="mx-auto"
-                  >
-                    <div className="relative w-full max-w-2xl mx-auto rounded-2xl overflow-hidden border-4 border-red-300 dark:border-red-700 shadow-xl" style={{ paddingBottom: '56.25%', height: 0 }}>
-                      <iframe
-                        className="absolute top-0 left-0 w-full h-full"
-                        src={embedUrl}
-                        title="فيديو توضيحي"
-                        frameBorder="0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      ></iframe>
-                    </div>
-                    <p className="text-center text-red-600 dark:text-red-400 font-semibold mt-3 text-lg">
-                      📺 شاهد الفيديو التوضيحي
-                    </p>
-                  </motion.div>
-                )}
-
-                {/* زر حفظت الكلمة */}
-                {onMarkLearned && (
-                  <Button
-                    onClick={handleMarkLearned}
-                    disabled={isProcessing}
-                    size="lg"
-                    className="w-full py-8 text-2xl bg-gradient-to-r from-green-500 to-emerald-500 hover:scale-105 transition-transform rounded-2xl shadow-xl"
-                  >
-                    {isProcessing ? (
-                      <>
-                        <Loader2 className="w-8 h-8 ml-3 animate-spin" />
-                        جارٍ الحفظ...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="w-8 h-8 ml-3" />
-                        حفظت الكلمة! 🎉
-                      </>
-                    )}
-                  </Button>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* زر الحفظ */}
+          <div className="text-center mt-8">
+            <Button
+              size="lg"
+              onClick={onMarkLearned}
+              className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white gap-3 text-2xl px-12 py-8 rounded-3xl shadow-2xl border-4 border-purple-300 transform hover:scale-105 transition-all"
+            >
+              <CheckCircle className="w-10 h-10" />
+              <span className="font-bold">حفظتها! ✨</span>
+            </Button>
+          </div>
         </CardContent>
       </Card>
-
-      {word.audio_url && <audio ref={audioRef} src={word.audio_url} preload="none" />}
-
-      {/* Note Dialog */}
-      <AnimatePresence>
-        {showNoteDialog && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              className="w-full max-w-md"
-            >
-              <Card className="bg-white dark:bg-gray-800">
-                <CardContent className="p-6">
-                  <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                    <StickyNote className="w-6 h-6 text-yellow-600" />
-                    ملاحظتك
-                  </h3>
-                  <Textarea
-                    value={userNote}
-                    onChange={(e) => setUserNote(e.target.value)}
-                    placeholder="اكتب ملاحظتك هنا..."
-                    className="min-h-[120px] mb-4 text-lg p-3"
-                  />
-                  <div className="flex gap-2">
-                    <Button onClick={saveNote} disabled={noteLoading} className="flex-1 py-3 text-lg">
-                      {noteLoading ? <Loader2 className="w-5 h-5 ml-2 animate-spin" /> : "حفظ"}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowNoteDialog(false)}
-                      className="flex-1 py-3 text-lg"
-                    >
-                      إلغاء
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </motion.div>
   );
 }

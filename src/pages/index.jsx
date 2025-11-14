@@ -74,6 +74,10 @@ import ManageQuran from "./ManageQuran";
 
 import UpdateWords from "./UpdateWords";
 
+import ImportTafsir from "./ImportTafsir";
+
+import AudioTest from "./AudioTest";
+
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 
 const PAGES = {
@@ -151,6 +155,10 @@ const PAGES = {
     ManageQuran: ManageQuran,
     
     UpdateWords: UpdateWords,
+    
+    ImportTafsir: ImportTafsir,
+    
+    AudioTest: AudioTest,
     
 }
 
@@ -252,6 +260,10 @@ function PagesContent() {
                 <Route path="/ManageQuran" element={<ManageQuran />} />
                 
                 <Route path="/UpdateWords" element={<UpdateWords />} />
+                
+                <Route path="/ImportTafsir" element={<ImportTafsir />} />
+                
+                <Route path="/AudioTest" element={<AudioTest />} />
                 
             </Routes>
         </Layout>

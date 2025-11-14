@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { updateCardWithSM2, getDueCards } from "../components/srs/SRSAlgorithm";
@@ -58,6 +59,8 @@ export default function Quiz() {
     animations_enabled: true
   });
 
+  const [quizTimeLimit, setQuizTimeLimit] = useState(30); // NEW
+
   // Effect to load user preferences on component mount
   useEffect(() => {
     const loadPreferences = async () => {
@@ -69,6 +72,8 @@ export default function Quiz() {
             confetti_enabled: user.preferences.confetti_enabled !== false,
             animations_enabled: user.preferences.animations_enabled !== false
           });
+          // Also set the initial quizTimeLimit from preferences if available
+          setQuizTimeLimit(user.preferences.quiz_time_limit !== undefined ? user.preferences.quiz_time_limit : 30);
         }
       } catch (error) {
         console.log("Could not load preferences:", error);
@@ -154,11 +159,11 @@ export default function Quiz() {
   const moveToNextQuestion = useCallback(() => {
      if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
-      setTimeLeft(30);
+      setTimeLeft(quizTimeLimit); // Reset time for next question
     } else {
       finishQuiz([...answers, pendingAnswerData]);
     }
-  }, [currentQuestionIndex, questions.length, answers, pendingAnswerData, finishQuiz]);
+  }, [currentQuestionIndex, questions.length, answers, pendingAnswerData, finishQuiz, quizTimeLimit]);
 
   const processAnswerSRS = useCallback(async (quality) => {
       if (!pendingAnswerData || isProcessingRating) return; // 🔥 منع الضغط المتكرر
@@ -248,20 +253,21 @@ export default function Quiz() {
 
   const handleTimeout = useCallback(() => {
     if (quizEnded || showDifficultyRating) return;
-    // For timeout, treat it as an incorrect answer with no selection
-    handleAnswer("");
+    // ✅ تصحيح: عند انتهاء الوقت، نعامله كإجابة خاطئة لهذا السؤال فقط (لا ننهي الاختبار كله)
+    handleAnswer(""); // إجابة فارغة = خطأ
   }, [quizEnded, showDifficultyRating, handleAnswer]);
 
 
   useEffect(() => {
     let timer;
-    if (quizState === 'active' && timeLeft > 0 && !quizEnded && !showDifficultyRating) {
+    // ✅ إذا كان quiz_time_limit = 0، لا نشغل المؤقت
+    if (quizState === 'active' && quizTimeLimit > 0 && timeLeft > 0 && !quizEnded && !showDifficultyRating) {
       timer = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
-    } else if (timeLeft === 0 && quizState === 'active') {
+    } else if (quizState === 'active' && quizTimeLimit > 0 && timeLeft === 0) {
       handleTimeout();
     }
     return () => clearInterval(timer);
-  }, [quizState, timeLeft, quizEnded, showDifficultyRating, handleTimeout]);
+  }, [quizState, timeLeft, quizEnded, showDifficultyRating, handleTimeout, quizTimeLimit]);
 
 
   const startQuiz = async (mode) => {
@@ -270,7 +276,12 @@ export default function Quiz() {
     try {
       const user = await base44.auth.me();
       
-      // Get user's learning level
+      // ✅ تحميل إعدادات الوقت من تفضيلات المستخدم
+      const timeLimit = user?.preferences?.quiz_time_limit !== undefined 
+        ? user.preferences.quiz_time_limit 
+        : 60; // ✅ تغيير الافتراضي من 30 إلى 60
+      setQuizTimeLimit(timeLimit);
+      
       const level = user?.preferences?.learning_level || "all";
       setUserLevel(level);
       
@@ -387,7 +398,7 @@ export default function Quiz() {
       setQuizState('active');
       setCurrentQuestionIndex(0);
       setAnswers([]);
-      setTimeLeft(30);
+      setTimeLeft(timeLimit); // ✅ استخدام الوقت من الإعدادات
       setHearts(5);
       setQuizEnded(false);
       setStartTime(Date.now());
@@ -417,6 +428,7 @@ export default function Quiz() {
     setCurrentQuestionIndex(0);
     setAnswers([]);
     setQuizMode('');
+    setTimeLeft(quizTimeLimit); // Reset time for potential new quiz setup
   };
 
   const renderContent = () => {
@@ -474,13 +486,26 @@ export default function Quiz() {
                   <div className="flex items-center gap-4">
                     <HeartsDisplay hearts={hearts} maxHearts={5} />
 
-                    <div className="text-center">
-                      <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
-                        <Clock className="w-5 h-5" />
-                        <span className="text-2xl font-bold">{timeLeft}</span>
+                    {/* ✅ عرض المؤقت فقط إذا كان الوقت محدد */}
+                    {quizTimeLimit > 0 && (
+                      <div className="text-center">
+                        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                          <Clock className="w-5 h-5" />
+                          <span className="text-2xl font-bold">{timeLeft}</span>
+                        </div>
+                        <p className="text-xs text-foreground/70">ثانية</p>
                       </div>
-                      <p className="text-xs text-foreground/70">ثانية</p>
-                    </div>
+                    )}
+                    
+                    {/* ✅ إذا كان الوقت غير محدد، نعرض رسالة */}
+                    {quizTimeLimit === 0 && (
+                      <div className="text-center">
+                        <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                          <Clock className="w-5 h-5" />
+                          <span className="text-sm font-medium">⏳ بدون حد زمني</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <Progress

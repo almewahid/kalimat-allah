@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, CheckCircle, AlertCircle, BookOpen, Download } from "lucide-react";
+import { Loader2, CheckCircle, AlertCircle, BookOpen, Download, Clock, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const SURAHS = [
@@ -129,7 +129,9 @@ function removeArabicDiacritics(text) {
   if (!text) return "";
   return text
     .replace(/[\u064B-\u065F\u0670]/g, "")
-    .replace(/ٱ/g, "ا"); // ✅ استبدال ٱ بـ ا
+    .replace(/ٱ/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/[أإآ]/g, "ا");
 }
 
 function sleep(ms) {
@@ -164,6 +166,46 @@ export default function ImportQuran() {
     setSelectedSurahs([]);
   };
 
+  // دالة لاستيراد سورة واحدة مع إعادة المحاولة عند فشل rate limit
+  const importSurahWithRetry = async (surah, retryCount = 0) => {
+    const maxRetries = 5; // زيادة عدد المحاولات
+    const baseDelay = 5000; // 5 ثواني
+    
+    try {
+      const response = await fetch(`https://api.quran.com/api/v4/quran/verses/uthmani?chapter_number=${surah.number}`);
+      
+      // معالجة خطأ rate limit
+      if (response.status === 429) {
+        if (retryCount < maxRetries) {
+          const waitTime = baseDelay * Math.pow(1.5, retryCount); // زيادة تدريجية أقل
+          const retryMsg = `⏳ تجاوزنا الحد المسموح. الانتظار ${Math.round(waitTime/1000)} ثانية (محاولة ${retryCount + 1}/${maxRetries})...`;
+          setLogs(prev => [...prev, retryMsg]);
+          await sleep(waitTime);
+          return await importSurahWithRetry(surah, retryCount + 1);
+        } else {
+          throw new Error(`تجاوز الحد بعد ${maxRetries} محاولات`);
+        }
+      }
+      
+      if (!response.ok) {
+        throw new Error(`رمز الحالة: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data.verses || [];
+      
+    } catch (error) {
+      if (retryCount < maxRetries && error.message.includes('fetch')) {
+        const waitTime = baseDelay * Math.pow(1.5, retryCount);
+        const retryMsg = `⏳ خطأ في الاتصال. إعادة المحاولة بعد ${Math.round(waitTime/1000)} ثانية...`;
+        setLogs(prev => [...prev, retryMsg]);
+        await sleep(waitTime);
+        return await importSurahWithRetry(surah, retryCount + 1);
+      }
+      throw error;
+    }
+  };
+
   const importQuran = async () => {
     if (selectedSurahs.length === 0) {
       setError("⚠️ الرجاء اختيار سورة واحدة على الأقل.");
@@ -180,55 +222,95 @@ export default function ImportQuran() {
     const surahsToImport = SURAHS.filter(s => selectedSurahs.includes(s.number));
 
     try {
-      const deleteMessage = "🗑️ جارٍ حذف البيانات القديمة للسور المحددة...";
-      setStatus(deleteMessage);
-      setLogs(prev => [...prev, deleteMessage]);
+      // ✅ التحقق من السور الموجودة (بدون حذف!)
+      const checkMessage = "🔍 جارٍ التحقق من السور الموجودة...";
+      setStatus(checkMessage);
+      setLogs(prev => [...prev, checkMessage]);
       
       const existingAyahs = await base44.entities.QuranAyah.filter({ 
         surah_number: { '$in': selectedSurahs } 
       });
       
-      if (existingAyahs.length > 0) {
-        for (const ayah of existingAyahs) {
-          await base44.entities.QuranAyah.delete(ayah.id);
+      // تجميع السور الموجودة حسب رقم السورة
+      const existingSurahsMap = {};
+      existingAyahs.forEach(ayah => {
+        if (!existingSurahsMap[ayah.surah_number]) {
+          existingSurahsMap[ayah.surah_number] = [];
         }
-        const deletedMessage = `✅ تم حذف ${existingAyahs.length} آية قديمة من السور المحددة.`;
-        setStatus(deletedMessage);
-        setLogs(prev => [...prev, deletedMessage]);
-      } else {
-        const noDataMessage = "ℹ️ لا توجد بيانات قديمة لحذفها للسور المحددة.";
-        setStatus(noDataMessage);
-        setLogs(prev => [...prev, noDataMessage]);
+        existingSurahsMap[ayah.surah_number].push(ayah.ayah_number);
+      });
+
+      // فلترة السور التي تحتاج استيراد (غير مكتملة أو غير موجودة)
+      const surahsNeedingImport = surahsToImport.filter(surah => {
+        const existingAyahNumbers = existingSurahsMap[surah.number] || [];
+        const isComplete = existingAyahNumbers.length === surah.ayahCount;
+        
+        if (isComplete) {
+          const skipMsg = `✓ سورة ${surah.name} موجودة بالكامل (${surah.ayahCount} آية) - تخطي`;
+          setLogs(prev => [...prev, skipMsg]);
+          return false;
+        } else if (existingAyahNumbers.length > 0) {
+          const partialMsg = `⚠️ سورة ${surah.name} موجودة جزئياً (${existingAyahNumbers.length}/${surah.ayahCount}) - سيتم إكمالها`;
+          setLogs(prev => [...prev, partialMsg]);
+          return true;
+        } else {
+          const newMsg = `➕ سورة ${surah.name} غير موجودة - سيتم استيرادها`;
+          setLogs(prev => [...prev, newMsg]);
+          return true;
+        }
+      });
+
+      if (surahsNeedingImport.length === 0) {
+        const allCompleteMsg = "✅ جميع السور المحددة موجودة بالكامل!";
+        setStatus(allCompleteMsg);
+        setLogs(prev => [...prev, allCompleteMsg]);
+        setIsImporting(false);
+        return;
       }
 
       let totalImported = 0;
       
-      for (let i = 0; i < surahsToImport.length; i++) {
-        const surah = surahsToImport[i];
+      for (let i = 0; i < surahsNeedingImport.length; i++) {
+        const surah = surahsNeedingImport[i];
         setCurrentSurah(surah.number);
         
-        const surahProgressMessage = `📖 استيراد سورة ${surah.name} (${i + 1}/${surahsToImport.length})...`;
+        const surahProgressMessage = `📖 استيراد سورة ${surah.name} (${i + 1}/${surahsNeedingImport.length})...`;
         setStatus(surahProgressMessage);
         setLogs(prev => [...prev, surahProgressMessage]);
         
         try {
-          const response = await fetch(`https://api.quran.com/api/v4/quran/verses/uthmani?chapter_number=${surah.number}`);
+          const verses = await importSurahWithRetry(surah);
           
-          if (!response.ok) {
-            throw new Error(`فشل تحميل سورة ${surah.name}. رمز الحالة: ${response.status}`);
+          if (verses.length === 0) {
+            const warningMsg = `⚠️ لم يتم العثور على آيات في سورة ${surah.name}`;
+            setLogs(prev => [...prev, warningMsg]);
+            continue;
           }
           
-          const data = await response.json();
-          const verses = data.verses || [];
+          // الحصول على الآيات الموجودة لهذه السورة
+          const existingAyahNumbers = existingSurahsMap[surah.number] || [];
           
           for (const verse of verses) {
             const ayahText = verse.text_uthmani || "";
+            const verseKey = verse.verse_key || "";
+            const parts = verseKey.split(':');
+            const ayahNumber = parts.length > 1 ? parseInt(parts[1]) : (verse.verse_number || 0);
+            
+            if (!ayahText || ayahNumber === 0) {
+              continue;
+            }
+            
+            // ✅ تخطي الآيات الموجودة (عدم التكرار!)
+            if (existingAyahNumbers.includes(ayahNumber)) {
+              continue;
+            }
+            
             const ayahData = {
               surah_number: surah.number,
               surah_name: surah.name,
-              ayah_number: verse.verse_number || (verse.verse_key ? parseInt(verse.verse_key.split(':')[1]) : 1),
+              ayah_number: ayahNumber,
               ayah_text: ayahText,
-              ayah_text_simple: removeArabicDiacritics(ayahText), // ✅ تطبيق الاستبدال
+              ayah_text_simple: removeArabicDiacritics(ayahText),
               juz_number: surah.juz
             };
             
@@ -237,27 +319,33 @@ export default function ImportQuran() {
           }
           
           setTotalAyahs(totalImported);
-          const surahSuccessMessage = `✅ تم استيراد ${verses.length} آية من سورة ${surah.name}.`;
+          const surahSuccessMessage = `✅ تم استيراد/إكمال سورة ${surah.name} (${verses.length} آية).`;
           setLogs(prev => [...prev, surahSuccessMessage]);
 
-          if (i < surahsToImport.length - 1) {
-            await sleep(500); 
+          // انتظار 3 ثواني بين السور
+          if (i < surahsNeedingImport.length - 1) {
+            const waitMsg = `⏸️ انتظار 3 ثواني قبل السورة التالية...`;
+            setLogs(prev => [...prev, waitMsg]);
+            await sleep(3000);
           }
           
         } catch (surahError) {
-          const surahErrorMessage = `تحذير: فشل استيراد سورة ${surah.name}: ${surahError.message}`;
+          const surahErrorMessage = `❌ فشل استيراد سورة ${surah.name}: ${surahError.message}`;
           console.error(surahErrorMessage, surahError);
           setError(prev => prev ? `${prev}\n${surahErrorMessage}` : surahErrorMessage);
-          setLogs(prev => [...prev, `❌ ${surahErrorMessage}`]);
+          setLogs(prev => [...prev, surahErrorMessage]);
+          
+          // الانتظار قبل المتابعة للسورة التالية
+          await sleep(5000);
         }
       }
       
-      const finalSuccessMessage = `✅ تم استيراد ${surahsToImport.length} سورة بنجاح! (${totalImported} آية)`;
+      const finalSuccessMessage = `✅ تم استيراد/إكمال ${surahsNeedingImport.length} سورة! (${totalImported} آية جديدة)`;
       setStatus(finalSuccessMessage);
       setLogs(prev => [...prev, finalSuccessMessage]);
       
     } catch (importError) {
-      const generalErrorMessage = `❌ خطأ عام في عملية الاستيراد: ${importError.message}`;
+      const generalErrorMessage = `❌ خطأ عام: ${importError.message}`;
       console.error("خطأ في الاستيراد:", importError);
       setError(generalErrorMessage);
       setStatus("فشلت عملية الاستيراد.");
@@ -267,8 +355,8 @@ export default function ImportQuran() {
     }
   };
 
-  const currentSurahIndex = currentSurah > 0 ? surahsToImport.findIndex(s => s.number === currentSurah) : -1;
   const surahsToImport = SURAHS.filter(s => selectedSurahs.includes(s.number));
+  const currentSurahIndex = currentSurah > 0 ? surahsToImport.findIndex(s => s.number === currentSurah) : -1;
   const displayedCurrentSurahCount = currentSurahIndex !== -1 ? currentSurahIndex + 1 : 0;
   const progressMax = surahsToImport.length;
   const progressValue = progressMax > 0 ? Math.round((displayedCurrentSurahCount / progressMax) * 100) : 0;
@@ -284,6 +372,20 @@ export default function ImportQuran() {
       >
         <h1 className="text-3xl font-bold gradient-text text-center mb-8">استيراد القرآن الكريم</h1>
 
+        {/* تحذير مُحسّن */}
+        <Alert className="mb-6 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+          <RefreshCw className="w-5 h-5 text-blue-600" />
+          <AlertDescription className="text-blue-800 dark:text-blue-300">
+            <div className="font-bold mb-2">💡 نظام ذكي للاستيراد</div>
+            <p className="text-sm">
+              • ✅ <strong>لا حذف للبيانات القديمة</strong> - النظام يكمل ما توقف عنده<br/>
+              • ✅ <strong>لا تكرار</strong> - يتم تخطي الآيات الموجودة تلقائياً<br/>
+              • ⏱️ انتظار 3 ثواني بين السور + إعادة محاولة تلقائية (5 مرات)<br/>
+              • 📊 يُنصح باستيراد 5-10 سور في كل مرة
+            </p>
+          </AlertDescription>
+        </Alert>
+
         <Card className="mb-6 bg-card border-border shadow-lg">
           <CardHeader>
             <div className="flex items-center gap-3">
@@ -293,7 +395,7 @@ export default function ImportQuran() {
                   اختيار السور للاستيراد
                 </CardTitle>
                 <p className="text-sm text-foreground/70 mt-1">
-                  اختر السور التي ترغب في استيرادها
+                  اختر السور التي ترغب في استيرادها أو إكمالها
                 </p>
               </div>
             </div>
@@ -353,7 +455,7 @@ export default function ImportQuran() {
               ) : (
                 <>
                   <Download className="w-5 h-5 ml-2" />
-                  بدء استيراد السور المحددة
+                  بدء استيراد/إكمال السور المحددة
                 </>
               )}
             </Button>
@@ -379,7 +481,7 @@ export default function ImportQuran() {
                 <Progress value={progressValue} className="h-3" />
                 {totalAyahs > 0 && (
                   <p className="text-sm text-foreground/70 text-right">
-                    إجمالي الآيات المستوردة: {totalAyahs} آية
+                    إجمالي الآيات الجديدة: {totalAyahs} آية
                   </p>
                 )}
               </div>

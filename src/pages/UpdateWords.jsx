@@ -2,207 +2,150 @@ import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle, AlertCircle, Loader2, RefreshCw } from "lucide-react";
+import { Loader2, CheckCircle, AlertCircle, RefreshCw, Database } from "lucide-react";
+import { motion } from "framer-motion";
 
-function removeArabicDiacritics(text) {
-  return text.replace(/[\u064B-\u0652\u0670]/g, "");
-}
+const SURAH_DATA = [
+  { number: 1, name: "الفاتحة" }, { number: 2, name: "البقرة" }, { number: 3, name: "آل عمران" },
+  { number: 4, name: "النساء" }, { number: 5, name: "المائدة" }, { number: 6, name: "الأنعام" },
+  { number: 7, name: "الأعراف" }, { number: 8, name: "الأنفال" }, { number: 9, name: "التوبة" },
+  { number: 10, name: "يونس" }, { number: 11, name: "هود" }, { number: 12, name: "يوسف" },
+  { number: 13, name: "الرعد" }, { number: 14, name: "إبراهيم" }, { number: 15, name: "الحجر" },
+  { number: 16, name: "النحل" }, { number: 17, name: "الإسراء" }, { number: 18, name: "الكهف" },
+  { number: 19, name: "مريم" }, { number: 20, name: "طه" }, { number: 21, name: "الأنبياء" },
+  { number: 22, name: "الحج" }, { number: 23, name: "المؤمنون" }, { number: 24, name: "النور" },
+  { number: 25, name: "الفرقان" }, { number: 26, name: "الشعراء" }, { number: 27, name: "النمل" },
+  { number: 28, name: "القصص" }, { number: 29, name: "العنكبوت" }, { number: 30, name: "الروم" },
+  { number: 31, name: "لقمان" }, { number: 32, name: "السجدة" }, { number: 33, name: "الأحزاب" },
+  { number: 34, name: "سبأ" }, { number: 35, name: "فاطر" }, { number: 36, name: "يس" },
+  { number: 37, name: "الصافات" }, { number: 38, name: "ص" }, { number: 39, name: "الزمر" },
+  { number: 40, name: "غافر" }, { number: 41, name: "فصلت" }, { number: 42, name: "الشورى" },
+  { number: 43, name: "الزخرف" }, { number: 44, name: "الدخان" }, { number: 45, name: "الجاثية" },
+  { number: 46, name: "الأحقاف" }, { number: 47, name: "محمد" }, { number: 48, name: "الفتح" },
+  { number: 49, name: "الحجرات" }, { number: 50, name: "ق" }, { number: 51, name: "الذاريات" },
+  { number: 52, name: "الطور" }, { number: 53, name: "النجم" }, { number: 54, name: "القمر" },
+  { number: 55, name: "الرحمن" }, { number: 56, name: "الواقعة" }, { number: 57, name: "الحديد" },
+  { number: 58, name: "المجادلة" }, { number: 59, name: "الحشر" }, { number: 60, name: "الممتحنة" },
+  { number: 61, name: "الصف" }, { number: 62, name: "الجمعة" }, { number: 63, name: "المنافقون" },
+  { number: 64, name: "التغابن" }, { number: 65, name: "الطلاق" }, { number: 66, name: "التحريم" },
+  { number: 67, name: "الملك" }, { number: 68, name: "القلم" }, { number: 69, name: "الحاقة" },
+  { number: 70, name: "المعارج" }, { number: 71, name: "نوح" }, { number: 72, name: "الجن" },
+  { number: 73, name: "المزمل" }, { number: 74, name: "المدثر" }, { number: 75, name: "القيامة" },
+  { number: 76, name: "الإنسان" }, { number: 77, name: "المرسلات" }, { number: 78, name: "النبأ" },
+  { number: 79, name: "النازعات" }, { number: 80, name: "عبس" }, { number: 81, name: "التكوير" },
+  { number: 82, name: "الانفطار" }, { number: 83, name: "المطففين" }, { number: 84, name: "الانشقاق" },
+  { number: 85, name: "البروج" }, { number: 86, name: "الطارق" }, { number: 87, name: "الأعلى" },
+  { number: 88, name: "الغاشية" }, { number: 89, name: "الفجر" }, { number: 90, name: "البلد" },
+  { number: 91, name: "الشمس" }, { number: 92, name: "الليل" }, { number: 93, name: "الضحى" },
+  { number: 94, name: "الشرح" }, { number: 95, name: "التين" }, { number: 96, name: "العلق" },
+  { number: 97, name: "القدر" }, { number: 98, name: "البينة" }, { number: 99, name: "الزلزلة" },
+  { number: 100, name: "العاديات" }, { number: 101, name: "القارعة" }, { number: 102, name: "التكاثر" },
+  { number: 103, name: "العصر" }, { number: 104, name: "الهمزة" }, { number: 105, name: "الفيل" },
+  { number: 106, name: "قريش" }, { number: 107, name: "الماعون" }, { number: 108, name: "الكوثر" },
+  { number: 109, name: "الكافرون" }, { number: 110, name: "النصر" }, { number: 111, name: "المسد" },
+  { number: 112, name: "الإخلاص" }, { number: 113, name: "الفلق" }, { number: 114, name: "الناس" }
+];
 
 export default function UpdateWords() {
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [totalWords, setTotalWords] = useState(0);
-  const [processedWords, setProcessedWords] = useState(0);
-  const [results, setResults] = useState({ success: 0, failed: 0, skipped: 0 });
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [progress, setProgress] = useState("");
   const [logs, setLogs] = useState([]);
-  const [isComplete, setIsComplete] = useState(false);
+  const [error, setError] = useState("");
 
-  const addLog = (message, type = "info") => {
-    setLogs(prev => [...prev, { message, type, timestamp: new Date().toLocaleTimeString() }]);
-  };
-
-  const updateAllWords = async () => {
-    setIsProcessing(true);
-    setProgress(0);
-    setResults({ success: 0, failed: 0, skipped: 0 });
+  const addSurahNumbers = async () => {
+    setIsUpdating(true);
+    setError("");
     setLogs([]);
-    setIsComplete(false);
-
-    addLog("🚀 بدء عملية تحديث الكلمات...", "info");
-
+    setProgress("🔄 بدء تحديث الكلمات...");
+    
     try {
-      // Get all words
-      const allWords = await base44.entities.QuranicWord.list();
-      setTotalWords(allWords.length);
-      addLog(`📚 تم العثور على ${allWords.length} كلمة في قاعدة البيانات`, "info");
-
-      let successCount = 0;
-      let failedCount = 0;
-      let skippedCount = 0;
-
+      const allWords = await base44.asServiceRole.entities.QuranicWord.list();
+      
+      const logMsg = `📊 تم تحميل ${allWords.length} كلمة`;
+      setLogs(prev => [...prev, logMsg]);
+      
+      let updated = 0;
+      let skipped = 0;
+      
       for (let i = 0; i < allWords.length; i++) {
         const word = allWords[i];
-        setProcessedWords(i + 1);
-        setProgress(((i + 1) / allWords.length) * 100);
-
-        try {
-          // Check what fields are missing
-          const missingFields = [];
-          
-          if (!word.meaning) missingFields.push('meaning');
-          if (!word.category) missingFields.push('category');
-          if (!word.root && word.difficulty_level !== 'مبتدئ') missingFields.push('root');
-          if (!word.context_snippet) missingFields.push('context_snippet');
-          if (!word.example_usage) missingFields.push('example_usage');
-          if (!word.reflection_question) missingFields.push('reflection_question');
-          if (!word.reflection_answer) missingFields.push('reflection_answer');
-          if (!word.alternative_meanings || word.alternative_meanings.length === 0) missingFields.push('alternative_meanings');
-
-          // Skip if no missing fields
-          if (missingFields.length === 0) {
-            skippedCount++;
-            addLog(`⏭️ تم تخطي "${word.word}" - البيانات مكتملة`, "skip");
-            continue;
-          }
-
-          addLog(`🔄 تحديث "${word.word}" - حقول ناقصة: ${missingFields.join(', ')}`, "info");
-
-          // Find ayah if context_snippet is missing or difficulty is advanced
-          let containingAyah = null;
-          if (!word.context_snippet || word.difficulty_level === 'متقدم') {
-            const ayahs = await base44.entities.QuranAyah.filter({
-              surah_name: word.surah_name,
-              ayah_number: word.ayah_number
-            });
-            containingAyah = ayahs.find(a =>
-              a.ayah_text_simple && removeArabicDiacritics(a.ayah_text_simple).includes(removeArabicDiacritics(word.word))
-            );
-          }
-
-          // Prepare LLM prompt
-          const prompt = `أنت خبير في معاني كلمات القرآن الكريم. أريدك أن تُنشئ بيانات تعليمية شاملة عن الكلمة القرآنية التالية للمستوى ${word.difficulty_level || 'متوسط'}:
-
-**الكلمة:** ${word.word}
-**السورة:** ${word.surah_name}
-**المستوى:** ${word.difficulty_level || 'متوسط'}
-**الآية رقم:** ${word.ayah_number}
-${containingAyah ? `**الآية الكاملة:** ${containingAyah.ayah_text}` : ''}
-
-**مهم جداً للمستوى المتقدم:**
-- في حقل "context_snippet": ضع **نص الآية الكاملة فقط** بدون أي شرح أو تفسير
-- مثال: "وَإِنَّهُ لِحُبِّ الْخَيْرِ لَشَدِيدٌ" وليس "وَأَمَّا مَنْ أَعْطَىٰ وَاتَّقَىٰ (الليل: 5) فمقتضى الآية..."
-
-يرجى تقديم البيانات التالية (فقط الحقول الناقصة: ${missingFields.join(', ')}):
-1. معنى الكلمة بشكل ${word.difficulty_level === 'مبتدئ' ? 'مبسط جداً ومناسب للأطفال' : word.difficulty_level === 'متوسط' ? 'واضح' : 'متقدم مع التحليل اللغوي'}
-2. تصنيف الكلمة (مثال: أسماء، أفعال، حروف، صفات، أخرى)
-3. جذر الكلمة (إن وجد، وإذا كان المستوى "مبتدئ" فاجعله فارغاً)
-4. جزء من الآية يحتوي على الكلمة ويوضح سياقها (للمستوى "متقدم"، يجب أن يكون نص الآية الكاملة فقط)
-5. مثال من القرآن أو جملة توضح استخدام الكلمة
-6. سؤال تأملي
-7. إجابة مختصرة للسؤال التأملي
-8. معانٍ بديلة (إن وجدت، يجب أن تكون قائمة من 2-4 معانٍ)`;
-
-          // Call LLM
-          const llmResponse = await base44.integrations.Core.InvokeLLM({
-            prompt: prompt,
-            response_json_schema: {
-              type: "object",
-              properties: {
-                meaning: { type: "string" },
-                category: { type: "string", enum: ["أسماء", "أفعال", "صفات", "حروف", "أخرى"] },
-                root: { type: "string" },
-                context_snippet: { type: "string" },
-                example_usage: { type: "string" },
-                reflection_question: { type: "string" },
-                reflection_answer: { type: "string" },
-                alternative_meanings: { type: "array", items: { type: "string" } }
-              }
-            }
-          });
-
-          // Prepare update data
-          const updateData = {};
-          
-          if (!word.meaning && llmResponse.meaning) updateData.meaning = llmResponse.meaning;
-          if (!word.category && llmResponse.category) updateData.category = llmResponse.category;
-          if (!word.root && word.difficulty_level !== 'مبتدئ' && llmResponse.root) updateData.root = llmResponse.root;
-          if (!word.example_usage && llmResponse.example_usage) updateData.example_usage = llmResponse.example_usage;
-          if (!word.reflection_question && llmResponse.reflection_question) updateData.reflection_question = llmResponse.reflection_question;
-          if (!word.reflection_answer && llmResponse.reflection_answer) updateData.reflection_answer = llmResponse.reflection_answer;
-          
-          // Handle context_snippet
-          if (!word.context_snippet) {
-            if (word.difficulty_level === 'متقدم' && containingAyah) {
-              updateData.context_snippet = containingAyah.ayah_text;
-            } else if (llmResponse.context_snippet) {
-              updateData.context_snippet = llmResponse.context_snippet;
-            }
-          }
-          
-          // Handle alternative_meanings
-          if ((!word.alternative_meanings || word.alternative_meanings.length === 0) && llmResponse.alternative_meanings) {
-            updateData.alternative_meanings = llmResponse.alternative_meanings;
-          }
-
-          // Update word
-          if (Object.keys(updateData).length > 0) {
-            await base44.entities.QuranicWord.update(word.id, updateData);
-            successCount++;
-            addLog(`✅ تم تحديث "${word.word}" بنجاح - ${Object.keys(updateData).length} حقل`, "success");
-          } else {
-            skippedCount++;
-            addLog(`⏭️ تم تخطي "${word.word}" - لا توجد بيانات للتحديث`, "skip");
-          }
-
-        } catch (error) {
-          failedCount++;
-          addLog(`❌ فشل تحديث "${word.word}": ${error.message}`, "error");
-          console.error(`Error updating word ${word.word}:`, error);
+        
+        // إذا كان surah_number موجود بالفعل، تخطي
+        if (word.surah_number) {
+          skipped++;
+          continue;
         }
-
-        // Update results
-        setResults({ success: successCount, failed: failedCount, skipped: skippedCount });
-
-        // Small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // البحث عن رقم السورة من الاسم
+        const surahInfo = SURAH_DATA.find(s => s.name === word.surah_name);
+        
+        if (surahInfo) {
+          await base44.asServiceRole.entities.QuranicWord.update(word.id, {
+            surah_number: surahInfo.number
+          });
+          
+          updated++;
+          
+          if (updated % 50 === 0) {
+            const progressMsg = `⏳ تم تحديث ${updated} من ${allWords.length} كلمة...`;
+            setProgress(progressMsg);
+            setLogs(prev => [...prev, progressMsg]);
+          }
+        } else {
+          const warnMsg = `⚠️ لم يُعثر على رقم السورة لـ: ${word.surah_name} (الكلمة: ${word.word})`;
+          setLogs(prev => [...prev, warnMsg]);
+          skipped++;
+        }
       }
-
-      setIsComplete(true);
-      addLog(`🎉 اكتملت عملية التحديث! نجح: ${successCount}, فشل: ${failedCount}, تم تخطيه: ${skippedCount}`, "success");
-
-    } catch (error) {
-      addLog(`❌ خطأ عام: ${error.message}`, "error");
-      console.error("Error in update process:", error);
+      
+      const finalMsg = `✅ تم التحديث بنجاح! (${updated} كلمة محدثة، ${skipped} تم تخطيها)`;
+      setProgress(finalMsg);
+      setLogs(prev => [...prev, finalMsg]);
+      
+    } catch (err) {
+      const errorMsg = `❌ خطأ: ${err.message}`;
+      setError(errorMsg);
+      setLogs(prev => [...prev, errorMsg]);
     } finally {
-      setIsProcessing(false);
+      setIsUpdating(false);
     }
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold gradient-text flex items-center gap-2">
-            <RefreshCw className="w-6 h-6" />
-            تحديث بيانات الكلمات
-          </CardTitle>
-          <p className="text-foreground/70">
-            هذه الأداة تقوم بتحديث الحقول الناقصة في جدول QuranicWord باستخدام الذكاء الاصطناعي
-          </p>
-        </CardHeader>
+    <div className="p-6 max-w-4xl mx-auto">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+        <h1 className="text-3xl font-bold gradient-text text-center mb-8">
+          🔧 تحديث بيانات الكلمات
+        </h1>
 
-        <CardContent className="space-y-6">
-          {/* Control Panel */}
-          <div className="flex gap-4">
+        <Alert className="mb-6 bg-blue-50 dark:bg-blue-900/20 border-blue-200">
+          <Database className="w-5 h-5 text-blue-600" />
+          <AlertDescription className="text-blue-800 dark:text-blue-300">
+            <div className="font-bold mb-2">📌 إضافة رقم السورة (surah_number)</div>
+            <p className="text-sm">
+              • إذا كانت الكلمات تحتوي فقط على <strong>surah_name</strong> (اسم السورة)<br/>
+              • سيتم إضافة <strong>surah_number</strong> (رقم السورة) تلقائياً<br/>
+              • هذا ضروري لتشغيل الصوت بشكل صحيح
+            </p>
+          </AlertDescription>
+        </Alert>
+
+        <Card className="bg-card border-border shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-primary flex items-center gap-2">
+              <RefreshCw className="w-6 h-6" />
+              إضافة أرقام السور للكلمات
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <Button
-              onClick={updateAllWords}
-              disabled={isProcessing}
+              onClick={addSurahNumbers}
+              disabled={isUpdating}
               size="lg"
-              className="flex-1"
+              className="w-full bg-primary hover:bg-primary/90"
             >
-              {isProcessing ? (
+              {isUpdating ? (
                 <>
                   <Loader2 className="w-5 h-5 ml-2 animate-spin" />
                   جارٍ التحديث...
@@ -210,90 +153,48 @@ ${containingAyah ? `**الآية الكاملة:** ${containingAyah.ayah_text}` 
               ) : (
                 <>
                   <RefreshCw className="w-5 h-5 ml-2" />
-                  بدء تحديث جميع الكلمات
+                  بدء التحديث
                 </>
               )}
             </Button>
-          </div>
 
-          {/* Progress */}
-          {isProcessing && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>التقدم: {processedWords} / {totalWords}</span>
-                <span>{Math.round(progress)}%</span>
+            {error && (
+              <Alert className="bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800">
+                <AlertCircle className="w-5 h-5 text-red-600" />
+                <AlertDescription className="text-red-800 dark:text-red-300">
+                  {error}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {progress && !error && (
+              <Alert className="bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+                <AlertDescription className="text-green-800 dark:text-green-300">
+                  {progress}
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+
+        {logs.length > 0 && (
+          <Card className="mt-6 bg-card border-border shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-primary">سجل العمليات</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 max-h-96 overflow-y-auto p-4 border border-border rounded-md bg-background-soft">
+                {logs.map((log, index) => (
+                  <div key={index} className="text-sm text-foreground/80 font-mono">
+                    {log}
+                  </div>
+                ))}
               </div>
-              <Progress value={progress} className="h-3" />
-            </div>
-          )}
-
-          {/* Results Summary */}
-          {(isProcessing || isComplete) && (
-            <div className="grid grid-cols-3 gap-4">
-              <Card className="bg-green-50 dark:bg-green-900/20">
-                <CardContent className="pt-6 text-center">
-                  <CheckCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-green-600">{results.success}</div>
-                  <div className="text-sm text-green-600">نجح</div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-red-50 dark:bg-red-900/20">
-                <CardContent className="pt-6 text-center">
-                  <AlertCircle className="w-8 h-8 text-red-600 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-red-600">{results.failed}</div>
-                  <div className="text-sm text-red-600">فشل</div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-gray-50 dark:bg-gray-900/20">
-                <CardContent className="pt-6 text-center">
-                  <RefreshCw className="w-8 h-8 text-gray-600 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-gray-600">{results.skipped}</div>
-                  <div className="text-sm text-gray-600">تم تخطيه</div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {/* Logs */}
-          {logs.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">سجل العمليات</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-1 max-h-96 overflow-y-auto">
-                  {logs.map((log, index) => (
-                    <div
-                      key={index}
-                      className={`text-sm p-2 rounded ${
-                        log.type === 'error' ? 'bg-red-50 text-red-800 dark:bg-red-900/20' :
-                        log.type === 'success' ? 'bg-green-50 text-green-800 dark:bg-green-900/20' :
-                        log.type === 'skip' ? 'bg-gray-50 text-gray-800 dark:bg-gray-900/20' :
-                        'bg-blue-50 text-blue-800 dark:bg-blue-900/20'
-                      }`}
-                    >
-                      <span className="text-xs opacity-70 ml-2">{log.timestamp}</span>
-                      {log.message}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Info Alert */}
-          <Alert>
-            <AlertDescription>
-              <strong>ملاحظة:</strong> هذه العملية قد تستغرق وقتاً طويلاً حسب عدد الكلمات. 
-              يتم تحديث الحقول الناقصة فقط في كل كلمة. الكلمات المكتملة يتم تخطيها تلقائياً.
-              <br />
-              <strong>للمستوى المتقدم:</strong> يتم وضع نص الآية الكاملة في حقل context_snippet.
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        )}
+      </motion.div>
     </div>
   );
 }

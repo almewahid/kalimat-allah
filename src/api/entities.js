@@ -59,6 +59,8 @@ export const images = base44.entities.images;
 
 export const categories = base44.entities.categories;
 
+export const QuranTafsir = base44.entities.QuranTafsir;
+
 
 
 // auth sdk:
