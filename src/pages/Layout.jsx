@@ -6,7 +6,7 @@ import { base44 } from "@/api/base44Client";
 // Utility function to create page URLs
 const createPageUrl = (pageName) => `/${pageName}`;
 import { AudioProvider } from "@/components/common/AudioContext";
-// import GlobalAudioPlayer from "./components/common/GlobalAudioPlayer";
+import GlobalAudioPlayer from "./components/common/GlobalAudioPlayer";
 import {
   Home,
   BookOpen,
@@ -452,7 +452,7 @@ export default function Layout({ children, currentPageName }) {
         </SidebarProvider>
 
         {/* ✅ مشغل الصوت العالمي */}
-        {/* <GlobalAudioPlayer /> */}
+        <GlobalAudioPlayer />
       </div>
     </AudioProvider>
   );
