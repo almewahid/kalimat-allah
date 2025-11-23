@@ -78,6 +78,8 @@ import ImportTafsir from "./ImportTafsir";
 
 import AudioTest from "./AudioTest";
 
+import ManageAudios from "./ManageAudios";
+
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 
 const PAGES = {
@@ -159,6 +161,8 @@ const PAGES = {
     ImportTafsir: ImportTafsir,
     
     AudioTest: AudioTest,
+    
+    ManageAudios: ManageAudios,
     
 }
 
@@ -264,6 +268,8 @@ function PagesContent() {
                 <Route path="/ImportTafsir" element={<ImportTafsir />} />
                 
                 <Route path="/AudioTest" element={<AudioTest />} />
+                
+                <Route path="/ManageAudios" element={<ManageAudios />} />
                 
             </Routes>
         </Layout>

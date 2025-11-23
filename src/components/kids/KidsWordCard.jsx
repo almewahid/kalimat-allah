@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Volume2, CheckCircle, Star, Sparkles, BookOpen, StickyNote, Eye, Loader2, RotateCcw, Heart } from "lucide-react";
+import { Volume2, CheckCircle, Star, Sparkles, BookOpen, StickyNote, Eye, Loader2, RotateCcw, Heart, Headphones } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAudio } from "@/components/common/AudioContext";
 
@@ -112,7 +112,7 @@ export default function KidsWordCard({ word, onMarkLearned }) {
 
   const handlePlayAyahRecitation = () => {
     if (!word?.surah_number || !word?.ayah_number) {
-      alert('⚠️ معلومات الآية غير متوفرة');
+      console.warn('⚠️ معلومات الآية غير متوفرة');
       return;
     }
     playAyah(word.surah_number, word.ayah_number, word);
@@ -120,7 +120,7 @@ export default function KidsWordCard({ word, onMarkLearned }) {
 
   const handlePlayWordAudio = () => {
     if (!word?.surah_number || !word?.ayah_number || !word?.word) {
-      alert('⚠️ معلومات الكلمة غير مكتملة');
+      console.warn('⚠️ معلومات الكلمة غير مكتملة');
       return;
     }
     playWord(word.surah_number, word.ayah_number, word.word, word);
@@ -130,14 +130,6 @@ export default function KidsWordCard({ word, onMarkLearned }) {
     if (!word?.meaning) return;
     const textToSpeak = `${word.meaning}. ${word.alternative_meanings?.join('، ') || ''}`;
     playMeaning(textToSpeak);
-  };
-
-  const categoryEmojis = {
-    "أسماء": "📛",
-    "أفعال": "⚡",
-    "صفات": "✨",
-    "حروف": "🔤",
-    "أخرى": "📖"
   };
 
   const getYouTubeEmbedUrl = (url) => {
@@ -297,7 +289,7 @@ export default function KidsWordCard({ word, onMarkLearned }) {
                   <p className="text-xl text-foreground/70 dark:text-gray-300">اضغط الزر لتعرف المعنى!</p>
                 </div>
 
-                {/* زر اكتشف المعنى - بألوان جذابة */}
+                {/* زر اكتشف المعنى */}
                 <Button
                   onClick={() => setShowMeaning(true)}
                   size="lg"
@@ -310,27 +302,27 @@ export default function KidsWordCard({ word, onMarkLearned }) {
                 {/* أزرار الاستماع */}
                 <div className="flex justify-center gap-4 flex-wrap">
                   {word.surah_number && word.ayah_number && (
-                    <Button
-                      onClick={handlePlayAyahRecitation}
-                      variant="outline"
-                      size="lg"
-                      className="py-6 text-xl border-4 border-green-300 dark:border-green-700 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-2xl"
-                    >
-                      <Volume2 className="w-6 h-6 ml-2 text-green-600 dark:text-green-400" />
-                      🎵 تلاوة الآية
-                    </Button>
-                  )}
+                    <>
+                      <Button
+                        onClick={handlePlayAyahRecitation}
+                        variant="outline"
+                        size="lg"
+                        className="py-6 text-xl border-4 border-green-300 dark:border-green-700 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-2xl"
+                      >
+                        <Volume2 className="w-6 h-6 ml-2 text-green-600 dark:text-green-400" />
+                        🎵 تلاوة الآية
+                      </Button>
 
-                  {word.surah_number && word.ayah_number && (
-                    <Button
-                      onClick={handlePlayWordAudio}
-                      variant="outline"
-                      size="lg"
-                      className="py-6 text-xl border-4 border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-2xl"
-                    >
-                      <Volume2 className="w-6 h-6 ml-2 text-blue-600 dark:text-blue-400" />
-                      🗣️ نطق الكلمة
-                    </Button>
+                      <Button
+                        onClick={handlePlayWordAudio}
+                        variant="outline"
+                        size="lg"
+                        className="py-6 text-xl border-4 border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-2xl"
+                      >
+                        <Headphones className="w-6 h-6 ml-2 text-blue-600 dark:text-blue-400" />
+                        نطق الكلمة
+                      </Button>
+                    </>
                   )}
                 </div>
               </motion.div>
@@ -344,11 +336,10 @@ export default function KidsWordCard({ word, onMarkLearned }) {
               >
                 {/* كارت المعنى */}
                 <div className="bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 rounded-2xl p-8 border-4 border-green-300 dark:border-green-700 text-center">
-                  <div className="text-6xl mb-4"></div>
                   <h3 className="text-2xl font-bold text-green-700 dark:text-green-300 mb-4">المعنى:</h3>
                   <p className="text-3xl font-bold text-green-900 dark:text-green-100 mb-4">{word.meaning}</p>
                   
-                  {/* زر صوت المعنى (Google TTS) */}
+                  {/* زر صوت المعنى */}
                   <Button
                     onClick={handleSpeakMeaning}
                     variant="outline"
@@ -369,25 +360,16 @@ export default function KidsWordCard({ word, onMarkLearned }) {
                       </ul>
                     </div>
                   )}
-
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.3 }}
-                    className="mt-8"
-                  >
-                    <div className="text-6xl"></div>
-                  </motion.div>
                 </div>
 
-                {/* السياق أو المثال */}
+                {/* السياق أو المثال مع زر صوت الآية */}
                 {(word.context_snippet || word.example_usage) && (
                   <div className="bg-amber-100 dark:bg-amber-900/30 rounded-3xl p-6 border-4 border-amber-300 dark:border-amber-700">
                     <div className="flex items-center justify-between mb-3">
                       <p className="text-xl font-bold text-amber-800 dark:text-amber-200">
                         📖 {word.context_snippet ? "الآية" : "مثال"}
                       </p>
-                      {/* زر صوت الآية (Quran API) */}
+                      {/* زر صوت الآية */}
                       {word.context_snippet && word.surah_number && word.ayah_number && (
                         <Button
                           onClick={handlePlayAyahRecitation}
@@ -405,36 +387,6 @@ export default function KidsWordCard({ word, onMarkLearned }) {
                     </p>
                   </div>
                 )}
-
-                {/* أزرار الصوت */}
-                <div className="bg-blue-50 dark:bg-blue-900/30 rounded-3xl p-6 border-4 border-blue-300 dark:border-blue-700">
-                  <p className="text-xl font-bold text-blue-800 dark:text-blue-200 mb-4">🎧 الأصوات</p>
-                  <div className="flex justify-center gap-4 flex-wrap">
-                    {word.surah_number && word.ayah_number && (
-                      <Button
-                        onClick={handlePlayAyahRecitation}
-                        variant="outline"
-                        size="lg"
-                        className="py-4 px-6 text-lg border-4 border-green-300 dark:border-green-700 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-2xl"
-                      >
-                        <Volume2 className="w-6 h-6 ml-2 text-green-600 dark:text-green-400" />
-                        🎵 تلاوة الآية
-                      </Button>
-                    )}
-
-                    {word.surah_number && word.ayah_number && (
-                      <Button
-                        onClick={handlePlayWordAudio}
-                        variant="outline"
-                        size="lg"
-                        className="py-4 px-6 text-lg border-4 border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-2xl"
-                      >
-                        <Volume2 className="w-6 h-6 ml-2 text-blue-600 dark:text-blue-400" />
-                        🗣️ نطق الكلمة
-                      </Button>
-                    )}
-                  </div>
-                </div>
 
                 {/* فيديو اليوتيوب */}
                 {embedUrl && (
@@ -523,22 +475,3 @@ export default function KidsWordCard({ word, onMarkLearned }) {
     </motion.div>
   );
 }
-
-/**
- * 📝 مصادر الأصوات:
- * 
- * 1️⃣ صوت الآية (تلاوة): من Quran API
- *    - المصدر: https://everyayah.com أو quran.com
- *    - يتم التشغيل عبر: playAyah() من AudioContext
- *    - يستخدم: surah_number و ayah_number
- * 
- * 2️⃣ صوت الكلمة (نطق): من Quran.com API
- *    - المصدر: https://api.quran.com/api/v4/verses/
- *    - يتم التشغيل عبر: playWord() من AudioContext
- *    - يحمل ملف صوتي خاص بكل كلمة في الآية
- * 
- * 3️⃣ صوت المعنى: من Google Text-to-Speech
- *    - المصدر: Web Speech API (speechSynthesis)
- *    - يتم التشغيل عبر: playMeaning() من AudioContext
- *    - صوت ذكوري عربي (ar-SA)
- */
